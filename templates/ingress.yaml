@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "gitlab.fullname" . }}
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    {{- with .Values.global.ingress.annotations }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  rules:
+    - host: {{ .Values.global.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "gitlab.fullname" . }}
+                port:
+                  number: 80
+  {{- if .Values.global.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.global.host }}
+      secretName: {{ .Values.global.ingress.tls.secretName }}
+  {{- end }}

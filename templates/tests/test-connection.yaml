@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "gitlab.fullname" . }}-test-connection
+  labels:
+    app: {{ include "gitlab.name" . }}
+spec:
+  containers:
+    - name: test-connection
+      image: appropriate/curl
+      command: ['curl', '-f', 'http://{{ include "gitlab.fullname" . }}:{{ .Values.gitlab.webservice.service.port }}']

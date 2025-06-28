@@ -1,0 +1,61 @@
+# Global settings
+global:
+  host: localhost  # Change to your domain
+  ingress:
+    enabled: true
+    annotations: {}
+    pathType: Prefix
+    paths:
+      - /
+    tls:
+      enabled: true
+      secretName: gitlab-tls  # Change to your TLS secret name
+
+# GitLab settings
+gitlab:
+  webservice:
+    replicas: 1
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+
+  serviceAccount:
+    create: true  # Set to true to create a service account
+    name: ""      # Leave empty to use the default name
+    annotations: {}  # Add any annotations here
+
+  ingress:
+    enabled: true  # Set to true to enable ingress
+    path: /
+    pathType: Prefix
+    annotations: {}
+    tls:
+      enabled: true
+      secretName: gitlab-tls  # Change to your TLS secret name
+
+# Autoscaling settings
+autoscaling:
+  enabled: true  # Set to true to enable autoscaling
+  minReplicas: 1  # Minimum number of replicas
+  maxReplicas: 5  # Maximum number of replicas
+  targetCPUUtilizationPercentage: 80  # Target CPU utilization percentage
+
+# PostgreSQL settings
+postgresql:
+  enabled: true
+  postgresqlUsername: gitlab
+  postgresqlPassword: gitlabpassword  # Change to a secure password
+  postgresqlDatabase: gitlabhq_production
+  service:
+    enabled: true
+    type: ClusterIP
+
+# Additional configurations
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "1"
+    memory: "1Gi"

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gitlab.fullname" . }}
+  labels:
+    app: {{ include "gitlab.name" . }}
+    chart: {{ include "gitlab.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  serviceAccountName: {{ include "gitlab.fullname" . }}-sa
+  replicas: {{ .Values.gitlab.webservice.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "gitlab.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "gitlab.name" . }}
+    spec:
+      containers:
+        - name: gitlab
+          image: "gitlab/gitlab-ee:{{ .Chart.AppVersion }}"
+          ports:
+            - containerPort: 80
+          env:
+            - name: GITLAB_OMNIBUS_CONFIG
+              value: |
+                external_url 'http://{{ .Values.global.host }}'
+                gitlab_rails['db_adapter'] = 'postgresql'
+                gitlab_rails['db_encoding'] = 'utf8'
+                gitlab_rails['db_host'] = '{{ .Release.Name }}-postgresql'
+                gitlab_rails['db_port'] = '5432'
+                gitlab_rails['db_username'] = '{{ .Values.postgresql.postgresqlUsername }}'
+                gitlab_rails['db_password'] = '{{ .Values.postgresql.postgresqlPassword }}' # Consider using a Secret
+                gitlab_rails['db_database'] = '{{ .Values.postgresql.postgresqlDatabase }}'
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
