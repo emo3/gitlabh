@@ -2,6 +2,12 @@
 .env
 .env.local
 
+# Ignore lock files
+*.lock
+
+# Ignore charts that can be generated
+charts/
+
 # Ignore logs
 *.log
 

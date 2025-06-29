@@ -26,14 +26,14 @@ spec:
           env:
             - name: GITLAB_OMNIBUS_CONFIG
               value: |
-                external_url 'http://{{ .Values.global.host }}'
+                external_url 'http://localhost'
                 gitlab_rails['db_adapter'] = 'postgresql'
                 gitlab_rails['db_encoding'] = 'utf8'
-                gitlab_rails['db_host'] = '{{ .Release.Name }}-postgresql'
+                gitlab_rails['db_host'] = 'gitlab-postgresql'
                 gitlab_rails['db_port'] = '5432'
-                gitlab_rails['db_username'] = '{{ .Values.postgresql.postgresqlUsername }}'
-                gitlab_rails['db_password'] = '{{ .Values.postgresql.postgresqlPassword }}' # Consider using a Secret
-                gitlab_rails['db_database'] = '{{ .Values.postgresql.postgresqlDatabase }}'
+                gitlab_rails['db_username'] = '{{ .Values.postgresql.auth.username }}'
+                gitlab_rails['db_password'] = '{{ .Values.postgresql.auth.password }}'
+                gitlab_rails['db_database'] = '{{ .Values.postgresql.auth.database }}'
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu | quote }}

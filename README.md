@@ -5,6 +5,10 @@
 ```sh
 cd ~/code/cookbooks
 helm create gitlabh
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+helm search repo bitnami/postgresql --versions
+helm dependency build
 ```
 
 See the following for more information
@@ -16,19 +20,28 @@ See the following for more information
 This will allow you run minikube without elevated permissions
 
 `minikube start --driver=docker`
-
-## Run Container
-
-### Verify all is well with code
+If you encounter permission issues with Docker, you may need to add your user to the Docker group. You can do this with the following command:
 
 ```sh
-helm template . --debug
-helm lint .
-kubectl config current-context
-kubectl config use-context docker-desktop
+sudo usermod -aG docker $USER
 ```
 
-### run the code
+After running this command, log out and log back in for the changes to take effect.
+
+## Verify all is well with code
+
+```sh
+# Make sure all is well with all helm templates
+helm template . --debug
+# Make sure you do not have any lint issues
+helm lint .
+# Check to make sure config is set correctly
+kubectl config current-context
+# If not set to minikube, set it
+kubectl config use-context minikube
+```
+
+## Run Container
 
 ```sh
 helm install gitlab . --dry-run --debug
@@ -38,6 +51,37 @@ helm install gitlab . --debug
 ### Verify everything is running
 
 `kubectl get pods`
+kubectl logs -f gitlab-6d545dff45-hdzl2
+
 
 if issues, fix them
 `helm uninstall gitlab`
+
+## Ingress Configuration
+
+All ingress settings are managed under the `gitlab.ingress` section in `values.yaml`.  
+To customize ingress (host, TLS, annotations, etc.), edit the following block:
+
+```yaml
+gitlab:
+  ingress:
+    enabled: true
+    path: /
+    pathType: Prefix
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls:
+      enabled: true
+      secretName: gitlab-tls
+    hosts:
+      - host: your-domain.example.com
+        paths:
+          - path: /
+```
+
+- **enabled**: Set to `true` to enable ingress.
+- **hosts**: Replace `your-domain.example.com` with your domain.
+- **tls**: Set up your TLS secret as needed.
+
+> **Note:** There is no `global.ingress` block. All ingress configuration must be done under `gitlab.ingress`.
