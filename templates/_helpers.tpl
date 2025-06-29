@@ -60,3 +60,9 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+spec:
+  serviceAccountName: {{ include "gitlab.serviceAccountName" . }}
+
+metadata:
+  name: {{ include "gitlab.serviceAccountName" . }}

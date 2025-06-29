@@ -9,43 +9,55 @@ global:
       - /
     tls:
       enabled: true
-      secretName: gitlab-tls  # Change to your TLS secret name
+      secretName: gitlab-tls  # Use a real TLS secret
 
 # GitLab settings
 gitlab:
   webservice:
-    replicas: 1
+    replicas: 2  # Use at least 2 for HA
     service:
       enabled: true
       type: ClusterIP
-      port: 80
+      ports:
+        - name: http
+          port: 80
+        - name: https
+          port: 443
 
   serviceAccount:
-    create: true  # Set to true to create a service account
+    create: true
     name: ""      # Leave empty to use the default name
-    annotations: {}  # Add any annotations here
+    annotations: {}
 
   ingress:
-    enabled: true  # Set to true to enable ingress
+    enabled: true
     path: /
     pathType: Prefix
-    annotations: {}
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
     tls:
       enabled: true
-      secretName: gitlab-tls  # Change to your TLS secret name
+      secretName: gitlab-tls
+    hosts:
+      - host: localhost
+        paths:
+          - path: /
 
 # Autoscaling settings
 autoscaling:
-  enabled: true  # Set to true to enable autoscaling
-  minReplicas: 1  # Minimum number of replicas
-  maxReplicas: 5  # Maximum number of replicas
-  targetCPUUtilizationPercentage: 80  # Target CPU utilization percentage
+  enabled: true
+  minReplicas: 2  # At least 2 for HA
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
 
 # PostgreSQL settings
 postgresql:
   enabled: true
+  image:
+    tag: "16.2"  # Explicitly set the image tag
   postgresqlUsername: gitlab
-  postgresqlPassword: gitlabpassword  # Change to a secure password
+  postgresqlPassword: gitlabpassword  # Change to a secure password or use a Secret
   postgresqlDatabase: gitlabhq_production
   service:
     enabled: true
@@ -55,7 +67,7 @@ postgresql:
 resources:
   requests:
     cpu: "500m"
-    memory: "512Mi"
+    memory: "1Gi"  # Increase memory for production
   limits:
-    cpu: "1"
-    memory: "1Gi"
+    cpu: "2"
+    memory: "4Gi"

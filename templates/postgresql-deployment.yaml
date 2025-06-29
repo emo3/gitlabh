@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: postgresql
-          image: postgres:{{ .Values.postgresql.image.tag }}  # Use a placeholder
+          image: postgres:{{ .Values.postgresql.image.tag }}
           env:
             - name: POSTGRES_USER
               value: {{ .Values.postgresql.postgresqlUsername }}
@@ -26,6 +26,9 @@ spec:
               value: {{ .Values.postgresql.postgresqlDatabase }}
           ports:
             - containerPort: 5432
+          service:
+            enabled: true
+            type: ClusterIP
           resources:
             requests:
               cpu: "250m"
@@ -33,3 +36,12 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+---
+# Values for the PostgreSQL deployment
+postgresql:
+  enabled: true
+  image:
+    tag: "16.2"  # Add this line, or your preferred version
+  postgresqlUsername: gitlab
+  postgresqlPassword: gitlabpassword  # Change to a secure password
+  postgresqlDatabase: gitlabhq_production

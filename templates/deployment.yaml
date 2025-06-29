@@ -36,8 +36,8 @@ spec:
                 gitlab_rails['db_database'] = '{{ .Values.postgresql.postgresqlDatabase }}'
           resources:
             requests:
-              cpu: "1"
-              memory: "2Gi"
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+              memory: {{ .Values.resources.requests.memory | quote }}
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              cpu: {{ .Values.resources.limits.cpu | quote }}
+              memory: {{ .Values.resources.limits.memory | quote }}
