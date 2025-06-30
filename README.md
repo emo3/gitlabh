@@ -13,13 +13,17 @@ helm dependency build
 
 See the following for more information
 <https://gitlab-com.gitlab.io/support/toolbox/upgrade-path>
+If using Enterprise edition
 <https://hub.docker.com/r/gitlab/gitlab-ee/tags>
+If using Community edition
+<https://hub.docker.com/r/gitlab/gitlab-ce/tags>
 
 ## Start Minikube with the Docker Driver
 
 This will allow you run minikube without elevated permissions
 
 `minikube start --driver=docker`
+
 If you encounter permission issues with Docker, you may need to add your user to the Docker group. You can do this with the following command:
 
 ```sh
@@ -46,16 +50,20 @@ kubectl config use-context minikube
 ```sh
 helm install gitlab . --dry-run --debug
 helm install gitlab . --debug
+kubectl wait pod gitlab-845c7769d6-q6nlq --for=condition=ready --timeout=60s
+
 ```
 
 ### Verify everything is running
 
 `kubectl get pods`
 kubectl logs -f gitlab-6d545dff45-hdzl2
-
+kubectl --namespace default port-forward gitlab-6d545dff45-2wqkb 8080:80
+<http://locahost:8080>
 
 if issues, fix them
 `helm uninstall gitlab`
+kubectl delete all --all -n default
 
 ## Ingress Configuration
 

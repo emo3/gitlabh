@@ -2,7 +2,7 @@ apiVersion: v2
 name: gitlab
 description: A Helm chart for GitLab with PostgreSQL
 version: 0.1.0
-appVersion: "18.1.1-ee.0"  # Specify the GitLab version you want to deploy
+appVersion: "18.1.1-ce.0"  # Specify the GitLab version you want to deploy
 icon: "https://about.gitlab.com/images/press/logo/png/gitlab-icon-rgb.png"
 dependencies:
   - name: postgresql

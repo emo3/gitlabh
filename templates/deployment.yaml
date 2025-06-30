@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: gitlab
-          image: "gitlab/gitlab-ee:{{ .Chart.AppVersion }}"
+          image: "gitlab/gitlab-ce:{{ .Chart.AppVersion }}"
           ports:
             - containerPort: 80
           env:

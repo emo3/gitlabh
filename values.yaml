@@ -12,8 +12,8 @@ gitlab:
       ports:
         - name: http
           port: 80
-        - name: https
-          port: 443
+    env:
+      GITLAB_ROOT_PASSWORD: "yourStrongPassword"
 
   serviceAccount:
     create: true
@@ -25,11 +25,8 @@ gitlab:
     path: /
     pathType: Prefix
     annotations:
-      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
     tls:
-      enabled: true
-      secretName: gitlab-tls
+      enabled: false
     hosts:
       - host: localhost
         paths:
@@ -57,7 +54,7 @@ postgresql:
 # Additional configurations
 resources:
   requests:
-    cpu: "500m"
+    cpu: "1"
     memory: "1Gi"  # Increase memory for production
   limits:
     cpu: "2"

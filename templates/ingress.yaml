@@ -6,14 +6,6 @@ metadata:
   annotations:
 {{- toYaml .Values.gitlab.ingress.annotations | nindent 4 }}
 spec:
-  tls:
-  {{- if .Values.gitlab.ingress.tls.enabled }}
-    - hosts:
-        {{- range .Values.gitlab.ingress.hosts }}
-        - {{ .host }}
-        {{- end }}
-      secretName: {{ .Values.gitlab.ingress.tls.secretName }}
-  {{- end }}
   rules:
   {{- range .Values.gitlab.ingress.hosts }}
     - host: {{ .host }}
