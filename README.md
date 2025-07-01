@@ -48,8 +48,8 @@ kubectl config use-context minikube
 ## Run Container
 
 ```sh
-helm install gitlab . --dry-run --debug
-helm install gitlab . --debug
+helm upgrade --install gitlab . --dry-run --debug
+helm upgrade --install gitlab . --debug
 kubectl wait pod gitlab-845c7769d6-q6nlq --for=condition=ready --timeout=60s
 
 ```
@@ -57,9 +57,20 @@ kubectl wait pod gitlab-845c7769d6-q6nlq --for=condition=ready --timeout=60s
 ### Verify everything is running
 
 `kubectl get pods`
-kubectl logs -f gitlab-6d545dff45-hdzl2
-kubectl --namespace default port-forward gitlab-6d545dff45-2wqkb 8080:80
 <http://locahost:8080>
+
+# Find your running GitLab pod name (it will be different from the example)
+export POD_NAME=$(kubectl get pods -l "app=gitlab" -o jsonpath="{.items[0].metadata.name}")
+echo "Your GitLab pod is: $POD_NAME"
+
+kubectl logs -f $POD_NAME
+
+# Forward local port 8080 to the pod's port 80
+kubectl port-forward $POD_NAME 8080:80
+
+## more debugging
+
+kubectl exec -it $POD_NAME -- gitlab-rails console
 
 if issues, fix them
 `helm uninstall gitlab`

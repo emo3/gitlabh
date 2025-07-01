@@ -13,7 +13,11 @@ gitlab:
         - name: http
           port: 80
     env:
-      GITLAB_ROOT_PASSWORD: "yourStrongPassword"
+      # This variable is directly used by GitLab Omnibus to set the initial root password
+      GITLAB_OMNIBUS_CONFIG: |
+        gitlab_rails['initial_root_password'] = 'your-new-strong-password' # <--- Add this line
+      # The GITLAB_ROOT_PASSWORD variable you had previously is not a standard GitLab Omnibus configuration.
+      # You can remove it or keep it if you have custom logic that uses it.
 
   serviceAccount:
     create: true
