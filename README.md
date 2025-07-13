@@ -8,13 +8,12 @@ Main documentation from GitLab about how to use helm charts
 <https://docs.gitlab.com/charts>
 
 ```sh
+# I used brew to install helm
+brew install helm minikube
 # add this repo to helm
 helm repo add gitlab http://charts.gitlab.io/
 # list current repo's
 helm repo list
-# my-gitlab corresponds to the release name, feel free to change it to suit your needs.
-# 9.1.1 is latest helm chart version of gitlab (07/08/2025)
-helm install my-gitlab gitlab/gitlab --version 9.1.1
 # Generate a base64 encoded password
 echo -n "YourSuperStrongPassword" | base64
 kubectl create secret generic gitlab-initial-root-password \
@@ -22,7 +21,22 @@ kubectl create secret generic gitlab-initial-root-password \
 # get a list of current secrets
 kubectl get secrets
 # what I am using, yes you need to set certmanager-issuer.email
+# initial command
 helm install gitlab gitlab/gitlab \
+  --set global.hosts.domain=localhost \
+  --set global.hosts.externalIP=127.0.0.1 \
+  --set global.hosts.https.enabled=false \
+  --values values1.yaml \
+  --set global.initialRootPassword.secret=gitlab-initial-root-password \
+  --set global.initialRootPassword.key=password \
+  --set certmanager-issuer.email=me@example.com
+# if you make changes
+helm upgrade gitlab gitlab/gitlab \
+  --values values1.yaml \
+  --set global.hosts.externalIP=127.0.0.1 \
+  --set certmanager-issuer.email=me@example.com
+# old values
+helm upgrade gitlab gitlab/gitlab \
   --set global.hosts.domain=localhost \
   --set global.hosts.externalIP=127.0.0.1 \
   --set global.hosts.https.enabled=false \
@@ -35,7 +49,7 @@ kubectl get pods
 # use the script to wait until they are all done
 ./wait.sh
 # forward the port
-kubectl port-forward svc/gitlab-webservice-default 8080:8080
+kubectl port-forward gitlab-webservice-default-597476bcff-k4546 8080:8080
 # check the site
 <http://localhost:8080>
 The default username is "root"
@@ -60,6 +74,8 @@ kubectl get pv
 ### issues
 
 Error: INSTALLATION FAILED: Kubernetes cluster unreachable: Get "http://localhost:8080/version": dial tcp [::1]:8080: connect: connection refused
+OR
+E0712 13:42:13.921029   51867 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://192.168.49.2:8443/api?timeout=32s\": dial tcp 192.168.49.2:8443: connect: no route to host"
 
 - Is minikube up and running?
 `minikube status`

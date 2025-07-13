@@ -2,3 +2,24 @@ global:
   initialRootPassword:
     secret: gitlab-initial-root-password
     key: password
+  hosts:
+    domain: localhost
+    https:
+      enabled: false
+
+# Disable certificate manager for local deployment
+certmanager:
+  install: false
+
+# Configure the webservice ingress to use HTTP
+gitlab:
+  webservice:
+    ingress:
+      tls:
+        enabled: false
+
+# Ensure the gitlab-runner connects to the correct internal URL
+gitlab-runner:
+  gitlabUrl: http://gitlab-webservice-default:8080
+  runners:
+    privileged: true
