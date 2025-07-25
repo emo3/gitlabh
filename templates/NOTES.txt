@@ -2,7 +2,7 @@
 {{- if .Values.gitlab.ingress.enabled }}
 {{- range $host := .Values.gitlab.ingress.hosts }}
   {{- range .paths }}
-  http{{ if $.Values.gitlab.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  http{{ if $.Values.gitlab.ingress.tls.enabled }}s{{ end }}://{{ $host.host }}{{ .path }}
   {{- end }}
 {{- end }}
 {{- else if contains "NodePort" .Values.service.type }}

@@ -8,3 +8,8 @@ dependencies:
   - name: postgresql
     version: 15.5.38  # Use the desired Bitnami chart version
     repository: https://charts.bitnami.com/bitnami
+maintainers:
+  - name: Edward Overton
+    email: notgiven@gmail.com
+sources:
+  - https://github.com/emo3/gitlabh

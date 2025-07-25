@@ -15,7 +15,7 @@ gitlab:
     env:
       # This variable is directly used by GitLab Omnibus to set the initial root password
       GITLAB_OMNIBUS_CONFIG: |
-        gitlab_rails['initial_root_password'] = 'your-new-strong-password' # <--- Add this line
+        gitlab_rails['initial_root_password'] = 'your-new-strong-password'
       # The GITLAB_ROOT_PASSWORD variable you had previously is not a standard GitLab Omnibus configuration.
       # You can remove it or keep it if you have custom logic that uses it.
 
@@ -28,13 +28,16 @@ gitlab:
     enabled: true
     path: /
     pathType: Prefix
-    annotations:
+    annotations: {}
     tls:
       enabled: false
     hosts:
       - host: localhost
         paths:
           - path: /
+
+  externalUrl: "http://localhost"
+  rootPasswordSecret: "gitlab-root-password"
 
 # Autoscaling settings
 autoscaling:
@@ -48,7 +51,7 @@ postgresql:
   enabled: true
   auth:
     username: gitlab
-    password: gitlabpassword  # Use a Secret for production
+    password: gitlabpassword
     database: gitlabhq_production
   primary:
     persistence:

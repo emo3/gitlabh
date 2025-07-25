@@ -1,11 +1,14 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: {{ include "gitlab.fullname" . }}-test-connection
+  name: "{{ include "gitlab.fullname" . }}-test-http"
   labels:
-    app: {{ include "gitlab.name" . }}
+    {{- include "gitlab.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
 spec:
   containers:
-    - name: test-connection
-      image: appropriate/curl
-      command: ['curl', '-f', 'http://{{ include "gitlab.fullname" . }}:{{ .Values.gitlab.webservice.service.port }}']
+    - name: curl
+      image: curlimages/curl:8.8.0
+      command: ['sh', '-c', 'curl -sf http://{{ include "gitlab.fullname" . }}:80/ || exit 1']
+  restartPolicy: Never
