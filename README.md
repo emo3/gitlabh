@@ -10,6 +10,8 @@ Main documentation from GitLab about how to use helm charts
 ```sh
 # add this repo to helm
 helm repo add gitlab http://charts.gitlab.io/
+# Update
+helm repo update
 # list current repo's
 helm repo list
 # my-gitlab corresponds to the release name, feel free to change it to suit your needs.
@@ -202,3 +204,6 @@ gitlab:
 - **tls**: Set up your TLS secret as needed.
 
 > **Note:** There is no `global.ingress` block. All ingress configuration must be done under `gitlab.ingress`.
+helm install gitlab gitlab/gitlab \
+  -f gitlab-local-values.yaml \
+  --timeout 900s

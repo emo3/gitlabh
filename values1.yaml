@@ -1,4 +1,0 @@
-global:
-  initialRootPassword:
-    secret: gitlab-initial-root-password
-    key: password

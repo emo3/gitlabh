@@ -1,0 +1,192 @@
+# gitlab-local-values.yaml
+#
+# This file provides a custom configuration for deploying GitLab on a local
+# Kubernetes cluster (like Minikube) using the official GitLab Helm chart.
+# It prioritizes reduced resource usage and direct access for local development,
+# now with HTTPS enabled via self-signed certificates and NGINX Ingress.
+#
+# TEMPORARY SECURITY WARNING:
+# This version of the file includes the initial root password directly in the YAML.
+# THIS IS HIGHLY INSECURE AND SHOULD NEVER BE USED IN PRODUCTION.
+# For production, always use a Kubernetes Secret as shown in previous versions.
+#
+# IMPORTANT: This configuration is NOT suitable for production environments.
+# Always refer to the official GitLab Helm chart documentation for the
+# specific chart version you are using for comprehensive and up-to-date settings.
+# Documentation: https://docs.gitlab.com/charts/
+
+global:
+  # Set a domain that will be used for Ingress. You will need to add this
+  # to your local /etc/hosts file, mapping it to your Minikube IP.
+  hosts:
+    domain: gitlab.example.com # Use a custom domain for Ingress
+    host: gitlab.example.com # Explicitly set the host for the main GitLab service
+    https: true # Enable HTTPS for the GitLab instance
+
+  # Configure the initial root password directly in the values file.
+  # WARNING: THIS IS INSECURE FOR PRODUCTION. Use a Kubernetes Secret instead.
+  initialRootPassword:
+    password: 'YourInsecureTestPasswordHere' # REPLACE THIS WITH A TEMPORARY PASSWORD
+
+  # Enable Cert-Manager to handle TLS certificates.
+  # For local development, we'll use a self-signed issuer.
+  certmanager:
+    install: true
+
+  # Explicitly disable GitLab Runner for initial setup to save resources on local machine.
+  # This was previously restarting.
+  gitlab-runner:
+    install: false
+
+  # Explicitly disable other components that were unexpectedly running before
+  # if they are not needed for a minimal local setup. This ensures the chart
+  # respects these settings and reduces resource consumption.
+  kas:
+    enabled: false
+  minio:
+    enabled: false
+  prometheus:
+    install: false
+  registry:
+    enabled: false
+  praefect:
+    enabled: false # Already set, but keeping for clarity
+  # Disable other potential default installs if not needed
+  gitlab-exporter:
+    enabled: false # Was running, disable if not needed
+  toolbox:
+    enabled: false # Was running, disable if not needed
+
+gitlab:
+  # Configure the webservice (Unicorn/Workhorse) to use ClusterIP,
+  # as it will be exposed via the NGINX Ingress controller.
+  webservice:
+    service:
+      type: ClusterIP # Change to ClusterIP as Ingress will expose it
+    # Reduce replicas for local development to save resources.
+    minReplicas: 1
+    maxReplicas: 1
+    # Adjust resources for webservice. GitLab's webservice is resource-intensive.
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1.5Gi # Start with 1.5GB, increase if OOMKilled
+      limits:
+        cpu: 1000m
+        memory: 2.5Gi # Allow up to 2.5GB
+
+  # Configure GitLab Shell for SSH access via Ingress.
+  gitlab-shell:
+    minReplicas: 1
+    maxReplicas: 1
+    host: gitlab.example.com # Match the global host
+    sshPort: 22 # Standard SSH port
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Reduce replicas for Gitaly (Git repository storage) to save resources.
+  gitaly:
+    minReplicas: 1
+    maxReplicas: 1
+    # For local, use the default storage class.
+    # If you need persistent storage, ensure your Minikube has a default storage class.
+    persistence:
+      storageClass: standard # Or your Minikube's default storage class
+      size: 20Gi # Adjust based on your expected repository size
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  # Reduce replicas for Sidekiq (background jobs) to save resources.
+  sidekiq:
+    minReplicas: 1
+    maxReplicas: 1
+    # Sidekiq can be memory hungry depending on workload.
+    resources:
+      requests:
+        cpu: 200m
+        memory: 768Mi # Start with 768MB, increase if OOMKilled
+      limits:
+        cpu: 500m
+        memory: 1.5Gi # Allow up to 1.5GB
+
+# Configure the certmanager-issuer for self-signed certificates.
+certmanager-issuer:
+  enabled: true # Enable the certmanager-issuer subchart
+  email: "gitlab-local@example.com" # Provide a dummy email for the issuer
+  # Configure a self-signed ClusterIssuer for local development
+  cluster:
+    issuer:
+      name: "letsencrypt-selfsigned" # Name of the ClusterIssuer
+      email: "gitlab-local@example.com" # Email for the self-signed issuer
+      # Use the self-signed solver for local testing
+      selfSigned: {}
+      # For ACME (real certificates), you would use:
+      # acme:
+      #   solvers:
+      #     - http01:
+      #         ingress:
+      #           class: nginx
+
+# Install bundled PostgreSQL for simplicity in local setup.
+# For production, an external highly available PostgreSQL is recommended.
+postgresql:
+  install: true
+  persistence:
+    storageClass: standard # Or your Minikube's default storage class
+    size: 10Gi # Adjust based on your expected database size
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# Install bundled Redis for simplicity in local setup.
+# For production, an external highly available Redis is recommended.
+redis:
+  install: true
+  master:
+    persistence:
+      storageClass: standard # Or your Minikube's default storage class
+      size: 5Gi # Adjust based on your expected Redis data size
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+  # Disable Redis replicas for local setup
+  replica:
+    replicaCount: 0
+
+# Enable the bundled NGINX Ingress controller to expose GitLab via HTTP/HTTPS.
+nginx-ingress:
+  enabled: true
+  controller:
+    service:
+      type: NodePort # Expose the Ingress controller via NodePort for Minikube access
+    # Adjust resources for the NGINX Ingress controller
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Configure persistent volumes for GitLab data.
+# Ensure your Minikube has a default StorageClass (usually 'standard').
+# If not, you might need to enable it: `minikube addons enable default-storageclass`
+# Or define a custom StorageClass in your Kubernetes cluster.
