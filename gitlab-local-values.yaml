@@ -29,12 +29,12 @@ global:
     password: 'YourInsecureTestPasswordHere' # REPLACE THIS WITH A TEMPORARY PASSWORD
 
   # Enable Cert-Manager to handle TLS certificates.
-  # For local development, we'll use a self-signed issuer.
+  # This will install the Cert-Manager controller, webhook, and cainjector.
+  # We are installing CRDs separately in Step 2.
   certmanager:
     install: true
 
   # Explicitly disable GitLab Runner for initial setup to save resources on local machine.
-  # This was previously restarting.
   gitlab-runner:
     install: false
 
@@ -50,12 +50,11 @@ global:
   registry:
     enabled: false
   praefect:
-    enabled: false # Already set, but keeping for clarity
-  # Disable other potential default installs if not needed
+    enabled: false
   gitlab-exporter:
-    enabled: false # Was running, disable if not needed
+    enabled: false
   toolbox:
-    enabled: false # Was running, disable if not needed
+    enabled: false
 
 gitlab:
   # Configure the webservice (Unicorn/Workhorse) to use ClusterIP,
