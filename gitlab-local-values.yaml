@@ -44,7 +44,7 @@ global:
   kas:
     enabled: false
   minio:
-    enabled: false
+    enabled: false # Ensure MinIO is disabled, so GitLab doesn't expect it
   prometheus:
     install: false
   registry:
@@ -54,7 +54,9 @@ global:
   gitlab-exporter:
     enabled: false
   toolbox:
-    enabled: false
+    enabled: true # Keep toolbox enabled for migrations/tasks, but disable its object storage backups
+    # If you want to disable toolbox entirely, set this to false and remove the backups section below
+    # If toolbox is disabled, migrations might not run correctly.
 
 gitlab:
   # Configure the webservice (Unicorn/Workhorse) to use ClusterIP,
@@ -116,7 +118,34 @@ gitlab:
         memory: 768Mi # Start with 768MB, increase if OOMKilled
       limits:
         cpu: 500m
-        memory: 1.5Gi # Allow up to 1.5GB
+        memory: 1.5Gi # Allow up to 1.5Gi
+
+  # --- CRITICAL OBJECT STORAGE CONFIGURATION ---
+  # These settings explicitly tell GitLab to use local disk storage for various features
+  # instead of looking for an S3-compatible object storage.
+  # This section directly addresses the "connection property cannot be empty" error.
+  appConfig:
+    object_store:
+      enabled: false # Ensure global object store is disabled for appConfig
+    artifacts:
+      enabled: false # Force local storage for artifacts
+    lfs:
+      enabled: false # Force local storage for LFS
+    uploads:
+      enabled: false # Force local storage for uploads
+    packages:
+      enabled: false # Force local storage for packages
+    # Add other object storage types here if they cause similar errors in the future,
+    # e.g., pages, pseudonymizer, etc.
+    backups:
+      objectStorage:
+        enabled: false # Disable object storage for general backups
+
+  # Explicitly disable object storage for toolbox backups
+  toolbox:
+    backups:
+      objectStorage:
+        enabled: false # This specifically addresses the toolbox backup error
 
 # Configure the certmanager-issuer for self-signed certificates.
 certmanager-issuer:
