@@ -7,7 +7,7 @@ START_TIME=$(date +%s)
 # Function to check the status of the pods
 check_pods() {
     # Get the status of all pods
-    kubectl get pods --no-headers | awk '{print $3}' | sort | uniq
+    kubectl get pods --no-headers --namespace gitlab | awk '{print $3}' | sort | uniq
 }
 
 # Wait until all pods are in a "Running" or "Completed" state
