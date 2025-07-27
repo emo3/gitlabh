@@ -1,50 +1,42 @@
 # gitlab-local-values.yaml
 #
-# This file provides a custom configuration for deploying GitLab on a local
-# Kubernetes cluster (like Minikube) using the official GitLab Helm chart.
-# It prioritizes reduced resource usage and direct access for local development,
-# now with HTTPS enabled via self-signed certificates and NGINX Ingress.
+# Modified to enable cert-manager as a subchart within the GitLab Helm chart
+# for local development on Minikube with self-signed certificates.
 #
 # TEMPORARY SECURITY WARNING:
-# This version of the file includes the initial root password directly in the YAML.
+# The initial root password is included directly in the YAML.
 # THIS IS HIGHLY INSECURE AND SHOULD NEVER BE USED IN PRODUCTION.
-# For production, always use a Kubernetes Secret as shown in previous versions.
+# Use a Kubernetes Secret for production.
 #
 # IMPORTANT: This configuration is NOT suitable for production environments.
-# Always refer to the official GitLab Helm chart documentation for the
-# specific chart version you are using for comprehensive and up-to-date settings.
-# Documentation: https://docs.gitlab.com/charts/
 
 global:
-  # Set a domain that will be used for Ingress. You will need to add this
-  # to your local /etc/hosts file, mapping it to your Minikube IP.
   hosts:
-    domain: gitlab.example.com # Use a custom domain for Ingress
-    host: gitlab.example.com # Explicitly set the host for the main GitLab service
-    https: true # Enable HTTPS for the GitLab instance
+    domain: gitlab.example.com
+    host: gitlab.example.com
+    https: true
 
-  # Configure the initial root password directly in the values file.
-  # WARNING: THIS IS INSECURE FOR PRODUCTION. Use a Kubernetes Secret instead.
+  # WARNING: Insecure for production. Use a Kubernetes Secret instead.
   initialRootPassword:
-    password: 'YourInsecureTestPasswordHere' # REPLACE THIS WITH A TEMPORARY PASSWORD
+    password: 'YourInsecureTestPasswordHere' # REPLACE THIS
 
-  # Enable Cert-Manager to handle TLS certificates.
-  # This will install the Cert-Manager controller, webhook, and cainjector.
-  # We are installing CRDs separately in Step 2.
+  # Enable cert-manager subchart to manage certificates within the GitLab release
   certmanager:
-    install: true
+    install: true # <--- Enable cert-manager subchart
+    # Configure cert-manager resources for local development
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
 
-  # Explicitly disable GitLab Runner for initial setup to save resources on local machine.
+  # Disable unnecessary components for local setup
   gitlab-runner:
     install: false
-
-  # Explicitly disable other components that were unexpectedly running before
-  # if they are not needed for a minimal local setup. This ensures the chart
-  # respects these settings and reduces resource consumption.
   kas:
     enabled: false
-  minio:
-    enabled: false # Ensure MinIO is disabled, so GitLab doesn't expect it
   prometheus:
     install: false
   registry:
@@ -53,35 +45,30 @@ global:
     enabled: false
   gitlab-exporter:
     enabled: false
-  toolbox:
-    enabled: true # Keep toolbox enabled for migrations/tasks, but disable its object storage backups
-    # If you want to disable toolbox entirely, set this to false and remove the backups section below
-    # If toolbox is disabled, migrations might not run correctly.
+
+  # Enable object storage globally (using MinIO)
+  object_store:
+    enabled: true
 
 gitlab:
-  # Configure the webservice (Unicorn/Workhorse) to use ClusterIP,
-  # as it will be exposed via the NGINX Ingress controller.
   webservice:
     service:
-      type: ClusterIP # Change to ClusterIP as Ingress will expose it
-    # Reduce replicas for local development to save resources.
+      type: ClusterIP
     minReplicas: 1
     maxReplicas: 1
-    # Adjust resources for webservice. GitLab's webservice is resource-intensive.
     resources:
       requests:
         cpu: 500m
-        memory: 1.5Gi # Start with 1.5GB, increase if OOMKilled
+        memory: 1.5Gi
       limits:
         cpu: 1000m
-        memory: 2.5Gi # Allow up to 2.5GB
+        memory: 2.5Gi
 
-  # Configure GitLab Shell for SSH access via Ingress.
   gitlab-shell:
     minReplicas: 1
     maxReplicas: 1
-    host: gitlab.example.com # Match the global host
-    sshPort: 22 # Standard SSH port
+    host: gitlab.example.com
+    sshPort: 22
     resources:
       requests:
         cpu: 100m
@@ -90,15 +77,12 @@ gitlab:
         cpu: 200m
         memory: 256Mi
 
-  # Reduce replicas for Gitaly (Git repository storage) to save resources.
   gitaly:
     minReplicas: 1
     maxReplicas: 1
-    # For local, use the default storage class.
-    # If you need persistent storage, ensure your Minikube has a default storage class.
     persistence:
-      storageClass: standard # Or your Minikube's default storage class
-      size: 20Gi # Adjust based on your expected repository size
+      storageClass: standard
+      size: 20Gi
     resources:
       requests:
         cpu: 500m
@@ -107,71 +91,81 @@ gitlab:
         cpu: 1000m
         memory: 2Gi
 
-  # Reduce replicas for Sidekiq (background jobs) to save resources.
   sidekiq:
     minReplicas: 1
     maxReplicas: 1
-    # Sidekiq can be memory hungry depending on workload.
     resources:
       requests:
         cpu: 200m
-        memory: 768Mi # Start with 768MB, increase if OOMKilled
+        memory: 768Mi
       limits:
         cpu: 500m
-        memory: 1.5Gi # Allow up to 1.5Gi
+        memory: 1.5Gi
 
-  # --- CRITICAL OBJECT STORAGE CONFIGURATION ---
-  # These settings explicitly tell GitLab to use local disk storage for various features
-  # instead of looking for an S3-compatible object storage.
-  # This section directly addresses the "connection property cannot be empty" error.
   appConfig:
-    object_store:
-      enabled: false # Ensure global object store is disabled for appConfig
     artifacts:
-      enabled: false # Force local storage for artifacts
+      enabled: true
+      storage: s3
     lfs:
-      enabled: false # Force local storage for LFS
+      enabled: true
+      storage: s3
     uploads:
-      enabled: false # Force local storage for uploads
+      enabled: true
+      storage: s3
     packages:
-      enabled: false # Force local storage for packages
-    # Add other object storage types here if they cause similar errors in the future,
-    # e.g., pages, pseudonymizer, etc.
+      enabled: true
+      storage: s3
     backups:
       objectStorage:
-        enabled: false # Disable object storage for general backups
+        enabled: true
 
-  # Explicitly disable object storage for toolbox backups
+  minio:
+    enabled: true
+    persistence:
+      storageClass: standard
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
   toolbox:
     backups:
+      enabled: true
       objectStorage:
-        enabled: false # This specifically addresses the toolbox backup error
+        enabled: true
 
-# Configure the certmanager-issuer for self-signed certificates.
+# Configure cert-manager to create a self-signed ClusterIssuer
 certmanager-issuer:
-  enabled: true # Enable the certmanager-issuer subchart
-  email: "gitlab-local@example.com" # Provide a dummy email for the issuer
-  # Configure a self-signed ClusterIssuer for local development
-  cluster:
-    issuer:
-      name: "letsencrypt-selfsigned" # Name of the ClusterIssuer
-      email: "gitlab-local@example.com" # Email for the self-signed issuer
-      # Use the self-signed solver for local testing
-      selfSigned: {}
-      # For ACME (real certificates), you would use:
-      # acme:
-      #   solvers:
-      #     - http01:
-      #         ingress:
-      #           class: nginx
+  email: "your-email@example.com" # REPLACE WITH YOUR EMAIL
+  # Explicitly define a self-signed ClusterIssuer
+  selfSigned:
+    enabled: true # Enable self-signed issuer for local development
+  # Optional: If you later want to use Let's Encrypt, you can configure an ACME issuer instead
+  # acme:
+  #   enabled: false
+  #   server: https://acme-v02.api.letsencrypt.org/directory
+  #   email: "your-email@example.com"
 
-# Install bundled PostgreSQL for simplicity in local setup.
-# For production, an external highly available PostgreSQL is recommended.
+# Configure Ingress to use the certificate issued by cert-manager
+global:
+  ingress:
+    enabled: true
+    annotations:
+      ingressClassName: nginx
+      cert-manager.io/cluster-issuer: selfsigned-cert-issuer # Name of the ClusterIssuer created by cert-manager subchart
+    tls:
+      enabled: true
+      secretName: gitlab-tls # Name of the TLS secret to be created by cert-manager
+
 postgresql:
   install: true
   persistence:
-    storageClass: standard # Or your Minikube's default storage class
-    size: 10Gi # Adjust based on your expected database size
+    storageClass: standard
+    size: 10Gi
   resources:
     requests:
       cpu: 200m
@@ -180,14 +174,12 @@ postgresql:
       cpu: 500m
       memory: 1Gi
 
-# Install bundled Redis for simplicity in local setup.
-# For production, an external highly available Redis is recommended.
 redis:
   install: true
   master:
     persistence:
-      storageClass: standard # Or your Minikube's default storage class
-      size: 5Gi # Adjust based on your expected Redis data size
+      storageClass: standard
+      size: 5Gi
     resources:
       requests:
         cpu: 100m
@@ -195,17 +187,14 @@ redis:
       limits:
         cpu: 200m
         memory: 512Mi
-  # Disable Redis replicas for local setup
   replica:
     replicaCount: 0
 
-# Enable the bundled NGINX Ingress controller to expose GitLab via HTTP/HTTPS.
 nginx-ingress:
   enabled: true
   controller:
     service:
-      type: NodePort # Expose the Ingress controller via NodePort for Minikube access
-    # Adjust resources for the NGINX Ingress controller
+      type: NodePort
     resources:
       requests:
         cpu: 100m
@@ -213,8 +202,3 @@ nginx-ingress:
       limits:
         cpu: 200m
         memory: 256Mi
-
-# Configure persistent volumes for GitLab data.
-# Ensure your Minikube has a default StorageClass (usually 'standard').
-# If not, you might need to enable it: `minikube addons enable default-storageclass`
-# Or define a custom StorageClass in your Kubernetes cluster.
