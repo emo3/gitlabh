@@ -9,36 +9,88 @@ command_exists () {
   command -v "$1" >/dev/null 2>&1
 }
 
+# Function to install missing dependencies
+install_missing () {
+  echo "Installing missing dependencies: $1..."
+
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux-based OS
+    if command_exists dnf; then
+      # Fedora/RHEL-based systems
+      sudo dnf install -y $1
+    elif command_exists apt-get; then
+      # Debian/Ubuntu-based systems
+      sudo apt-get update
+      sudo apt-get install -y $1
+    else
+      echo "❌ Unsupported Linux package manager. Please install $1 manually."
+      exit 1
+    fi
+
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    brew install $1
+
+  else
+    echo "❌ Unsupported OS: $OSTYPE. Please install $1 manually."
+    exit 1
+  fi
+}
+
 echo ""
 echo "--- Step 1: Verify Prerequisites ---"
 # Check for Docker
 if ! command_exists docker; then
-  echo "❌ Docker is not installed. Please install Docker."
-  exit 1
+  echo "❌ Docker is not installed. Attempting to install Docker..."
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    install_missing docker
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    install_missing docker
+  fi
+  if ! command_exists docker; then
+    echo "❌ Docker installation failed. Please install Docker manually."
+    exit 1
+  fi
 fi
 
 # Check for Minikube
 if ! command_exists minikube; then
-  echo "❌ Minikube is not installed. Please install Minikube."
-  exit 1
+  echo "❌ Minikube is not installed. Attempting to install Minikube..."
+  install_missing minikube
+  if ! command_exists minikube; then
+    echo "❌ Minikube installation failed. Please install Minikube manually."
+    exit 1
+  fi
 fi
 
 # Check for kubectl
 if ! command_exists kubectl; then
-  echo "❌ kubectl is not installed. Please install kubectl."
-  exit 1
+  echo "❌ kubectl is not installed. Attempting to install kubectl..."
+  install_missing kubectl
+  if ! command_exists kubectl; then
+    echo "❌ kubectl installation failed. Please install kubectl manually."
+    exit 1
+  fi
 fi
 
 # Check for Helm
 if ! command_exists helm; then
-  echo "❌ Helm is not installed. Please install Helm."
-  exit 1
+  echo "❌ Helm is not installed. Attempting to install Helm..."
+  install_missing helm
+  if ! command_exists helm; then
+    echo "❌ Helm installation failed. Please install Helm manually."
+    exit 1
+  fi
 fi
 
 # Check for Caddy
 if ! command_exists caddy; then
-  echo "❌ Caddy is not installed. Please install Caddy."
-  exit 1
+  echo "❌ Caddy is not installed. Attempting to install Caddy..."
+  install_missing caddy
+  if ! command_exists caddy; then
+    echo "❌ Caddy installation failed. Please install Caddy manually."
+    exit 1
+  fi
 fi
 
 echo "✅ All prerequisites are met."
@@ -57,6 +109,12 @@ echo ""
 echo "--- Step 4: Install GitLab Helm Chart ---"
 if [ ! -f gitlab-local-values.yaml ]; then
   echo "❌ Missing 'gitlab-local-values.yaml' in current directory."
+  exit 1
+fi
+
+# Check if required values are set in gitlab-local-values.yaml
+if ! grep -q "externalUrl:" gitlab-local-values.yaml; then
+  echo "❌ 'externalUrl' is not set in gitlab-local-values.yaml. Please add the URL."
   exit 1
 fi
 
@@ -117,10 +175,10 @@ EOF
 
 echo ""
 echo "--- Step 8: Start Caddy ---"
-sudo systemctl restart caddy
+sudo systemctl restart caddy || { echo "❌ Failed to restart Caddy. Check system logs for more details."; exit 1; }
 sleep 2
 
 echo ""
 echo "✅ GitLab is now accessible at: https://gitlab.example.com"
 echo "➡️ Default login: root / YourInsecureTestPasswordHere (from your YAML file)"
-echo "⚠️ You may see a browser security warning due to the self-signed
+echo "⚠️ Note: The connection is secured with a self-signed certificate, so your browser may show a security warning. You can safely proceed by adding an exception."
