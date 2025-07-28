@@ -15,11 +15,10 @@ global:
     domain: gitlab.example.com
     host: gitlab.example.com
     https: true
-
+  externalUrl: "https://gitlab.example.com"  # ADDED: External URL for GitLab
   # WARNING: Insecure for production. Use a Kubernetes Secret instead.
   initialRootPassword:
     password: 'YourInsecureTestPasswordHere' # REPLACE THIS
-
   # Enable cert-manager subchart to manage certificates within the GitLab release
   certmanager:
     install: true # <--- Enable cert-manager subchart

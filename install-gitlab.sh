@@ -215,37 +215,6 @@ if ! grep -q "gitlab.example.com" /etc/hosts; then
 fi
 
 echo ""
-echo "--- Step 7: Configure Caddy Reverse Proxy ---"
-MINIKUBE_IP=$(minikube ip)
-
-# Dynamically retrieve the GitLab service port
-echo "Retrieving GitLab service port..."
-GITLAB_PORT=$(kubectl get service -n gitlab -l app.kubernetes.io/name=webservice -o jsonpath='{.items[0].spec.ports[?(@.name=="http")].nodePort}')
-
-if [ -z "$GITLAB_PORT" ]; then
-  echo "❌ Failed to retrieve GitLab service port. Ensure GitLab is properly deployed."
-  exit 1
-fi
-echo "GitLab service port: $GITLAB_PORT"
-
-cat <<EOF | sudo tee /etc/caddy/Caddyfile
-gitlab.example.com:443 {
-    reverse_proxy https://$MINIKUBE_IP:$GITLAB_PORT {
-        header_up Host gitlab.example.com
-        transport http {
-            tls_insecure_skip_verify
-        }
-    }
-    tls internal
-}
-EOF
-
-echo ""
-echo "--- Step 8: Start Caddy ---"
-sudo systemctl restart caddy
-sleep 2
-
-echo ""
 echo "✅ GitLab is now accessible at: https://gitlab.example.com"
 echo "➡️ Default login: root / YourInsecureTestPasswordHere (from your YAML file)"
 echo "⚠️ You may see a browser security warning due to the self-signed certificate."
