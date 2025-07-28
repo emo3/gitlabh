@@ -37,6 +37,55 @@ install_missing () {
   fi
 }
 
+# Function to check if Docker is running and start it if not
+start_docker_if_not_running () {
+  echo "Checking if Docker is running..."
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "❌ Docker is not running. Starting Docker..."
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      # macOS: Start Docker Desktop automatically
+      open -a Docker
+      # Wait for Docker to start (increased wait time for macOS)
+      echo "Waiting for Docker to start on macOS (60 seconds)..."
+      sleep 60  # Give it 60 seconds to start up
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+      # Linux: Try to start Docker using systemd
+      sudo systemctl start docker
+      # Wait for Docker to start
+      echo "Waiting for Docker to start on Linux..."
+      sleep 10  # Give it 10 seconds to start up
+    fi
+
+    # Check if Docker started successfully
+    if ! docker info >/dev/null 2>&1; then
+      echo "❌ Docker failed to start. Please ensure Docker is installed and properly configured."
+      exit 1
+    fi
+  fi
+
+  echo "✅ Docker is running."
+}
+
+# Function to check if Docker socket exists and is accessible
+check_docker_socket () {
+  if [ ! -S /var/run/docker.sock ] && [ ! -S /Users/emo3/.docker/run/docker.sock ]; then
+    echo "❌ Docker socket not found. Docker might not be properly initialized."
+    exit 1
+  fi
+}
+
+# Function to start Minikube if not already running
+start_minikube_if_not_running () {
+  if ! minikube status >/dev/null 2>&1; then
+    echo "Minikube is not running. Starting Minikube..."
+    minikube start --memory=8192 --cpus=4 --driver=docker
+  else
+    echo "✅ Minikube is already running. Skipping Minikube start."
+  fi
+}
+
 echo ""
 echo "--- Step 1: Verify Prerequisites ---"
 # Check for Docker
@@ -51,6 +100,10 @@ if ! command_exists docker; then
     echo "❌ Docker installation failed. Please install Docker manually."
     exit 1
   fi
+else
+  # Check if Docker is running and start it if necessary
+  start_docker_if_not_running
+  check_docker_socket
 fi
 
 # Check for Minikube
@@ -97,13 +150,27 @@ echo "✅ All prerequisites are met."
 
 echo ""
 echo "--- Step 2: Start Minikube ---"
-minikube start --memory=8192 --cpus=4 --driver=docker
+# Start Minikube only if it is not already running
+start_minikube_if_not_running
 
 echo ""
 echo "--- Step 3: Add Helm Repo & Namespace ---"
-helm repo add gitlab https://charts.gitlab.io/
-helm repo update
-kubectl create namespace gitlab || echo "Namespace 'gitlab' already exists."
+# Check if the GitLab Helm repo is already added
+if helm repo list | grep -q "gitlab"; then
+  echo "✅ GitLab Helm repo already exists. Skipping adding repo."
+else
+  helm repo add gitlab https://charts.gitlab.io/
+  helm repo update
+  echo "✅ GitLab Helm repo added and updated."
+fi
+
+# Check if the GitLab namespace exists
+if kubectl get namespace gitlab >/dev/null 2>&1; then
+  echo "✅ GitLab namespace already exists. Skipping namespace creation."
+else
+  kubectl create namespace gitlab
+  echo "✅ GitLab namespace created."
+fi
 
 echo ""
 echo "--- Step 4: Install GitLab Helm Chart ---"
@@ -175,10 +242,10 @@ EOF
 
 echo ""
 echo "--- Step 8: Start Caddy ---"
-sudo systemctl restart caddy || { echo "❌ Failed to restart Caddy. Check system logs for more details."; exit 1; }
+sudo systemctl restart caddy
 sleep 2
 
 echo ""
 echo "✅ GitLab is now accessible at: https://gitlab.example.com"
 echo "➡️ Default login: root / YourInsecureTestPasswordHere (from your YAML file)"
-echo "⚠️ Note: The connection is secured with a self-signed certificate, so your browser may show a security warning. You can safely proceed by adding an exception."
+echo "⚠️ You may see a browser security warning due to the self-signed certificate."
