@@ -24,14 +24,7 @@ fi
 echo ""
 echo "--- Step 5: Wait for GitLab Pods to be Ready ---"
 echo "Waiting for all GitLab pods to be ready (timeout: 600 seconds)..."
-if ! kubectl wait --namespace gitlab \
-  --for=condition=Ready pod \
-  --selector=app.kubernetes.io/part-of=gitlab \
-  --timeout=600s; then
-  echo "❌ Timed out waiting for GitLab pods to be ready after 600 seconds."
-  echo "Check pod status with: kubectl get pods -n gitlab"
-  exit 1
-fi
+./wait.sh
 echo "All GitLab pods are ready."
 
 echo ""
