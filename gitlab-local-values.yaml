@@ -1,203 +1,80 @@
-# gitlab-local-values.yaml
-#
-# Modified to enable cert-manager as a subchart within the GitLab Helm chart
-# for local development on Minikube with self-signed certificates.
-#
-# TEMPORARY SECURITY WARNING:
-# The initial root password is included directly in the YAML.
-# THIS IS HIGHLY INSECURE AND SHOULD NEVER BE USED IN PRODUCTION.
-# Use a Kubernetes Secret for production.
-#
-# IMPORTANT: This configuration is NOT suitable for production environments.
-
 global:
   hosts:
-    domain: gitlab.example.com
-    host: gitlab.example.com
-    https: true
-  externalUrl: "https://gitlab.example.com"  # ADDED: External URL for GitLab
-  # WARNING: Insecure for production. Use a Kubernetes Secret instead.
-  initialRootPassword:
-    password: 'YourInsecureTestPasswordHere' # REPLACE THIS
-  # Enable cert-manager subchart to manage certificates within the GitLab release
-  certmanager:
-    install: true # <--- Enable cert-manager subchart
-    # Configure cert-manager resources for local development
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
+    domain: local.gitlab.example.com
+    externalIP: 192.168.49.2 # Replace with your minikube IP
 
-  # Disable unnecessary components for local setup
-  gitlab-runner:
-    install: false
-  kas:
-    enabled: false
-  prometheus:
-    install: false
-  registry:
-    enabled: false
-  praefect:
-    enabled: false
-  gitlab-exporter:
-    enabled: false
-
-  # Enable object storage globally (using MinIO)
-  object_store:
-    enabled: true
-
-gitlab:
-  webservice:
-    service:
-      type: ClusterIP
-    minReplicas: 1
-    maxReplicas: 1
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1.5Gi
-      limits:
-        cpu: 1000m
-        memory: 2.5Gi
-
-  gitlab-shell:
-    minReplicas: 1
-    maxReplicas: 1
-    host: gitlab.example.com
-    sshPort: 22
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
-
-  gitaly:
-    minReplicas: 1
-    maxReplicas: 1
-    persistence:
-      storageClass: standard
-      size: 20Gi
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-      limits:
-        cpu: 1000m
-        memory: 2Gi
-
-  sidekiq:
-    minReplicas: 1
-    maxReplicas: 1
-    resources:
-      requests:
-        cpu: 200m
-        memory: 768Mi
-      limits:
-        cpu: 500m
-        memory: 1.5Gi
-
-  appConfig:
-    artifacts:
-      enabled: true
-      storage: s3
-    lfs:
-      enabled: true
-      storage: s3
-    uploads:
-      enabled: true
-      storage: s3
-    packages:
-      enabled: true
-      storage: s3
-    backups:
-      objectStorage:
-        enabled: true
-
-  minio:
-    enabled: true
-    persistence:
-      storageClass: standard
-      size: 10Gi
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 200m
-        memory: 512Mi
-
-  toolbox:
-    backups:
-      enabled: true
-      objectStorage:
-        enabled: true
-
-# Configure cert-manager to create a self-signed ClusterIssuer
-certmanager-issuer:
-  email: "your-email@example.com" # REPLACE WITH YOUR EMAIL
-  # Explicitly define a self-signed ClusterIssuer
-  selfSigned:
-    enabled: true # Enable self-signed issuer for local development
-  # Optional: If you later want to use Let's Encrypt, you can configure an ACME issuer instead
-  # acme:
-  #   enabled: false
-  #   server: https://acme-v02.api.letsencrypt.org/directory
-  #   email: "your-email@example.com"
-
-# Configure Ingress to use the certificate issued by cert-manager
-global:
   ingress:
-    enabled: true
-    annotations:
-      ingressClassName: nginx
-      cert-manager.io/cluster-issuer: selfsigned-cert-issuer # Name of the ClusterIssuer created by cert-manager subchart
+    configureCertmanager: false
     tls:
-      enabled: true
-      secretName: gitlab-tls # Name of the TLS secret to be created by cert-manager
+      enabled: false
 
-postgresql:
-  install: true
-  persistence:
-    storageClass: standard
-    size: 10Gi
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
-
-redis:
-  install: true
-  master:
-    persistence:
-      storageClass: standard
-      size: 5Gi
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 200m
-        memory: 512Mi
-  replica:
-    replicaCount: 0
+  edition: ce
 
 nginx-ingress:
   enabled: true
   controller:
+    replicaCount: 1
     service:
       type: NodePort
+      nodePorts:
+        http: 30080
+        https: 30443
+
+certmanager:
+  install: false
+
+gitlab:
+  webservice:
+    replicas: 1
+    minReplicas: 1
+    maxReplicas: 1
+
+  sidekiq:
+    replicas: 1
+
+  toolbox:
+    enabled: true
+
+  migrations:
+    enabled: true
+
+  gitaly:
+    replicas: 1
+
+  kas:
+    enabled: true
+
+  gitlab-shell:
+    minReplicas: 1
+    maxReplicas: 1
+
+  gitlab-exporter:
+    enabled: true
+
+  prometheus:
+    install: true
+
+  minio:
     resources:
       requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
         memory: 256Mi
+        cpu: 100m
+    persistence:
+      size: 1Gi
+
+  redis:
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+
+  postgresql:
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+    image:
+      tag: 14.10.0
+
+gitlab-runner:
+  install: false

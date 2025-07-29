@@ -1,6 +1,4 @@
-gitlab.example.com:443 {
-    reverse_proxy http://localhost:8080 {
-        header_up Host gitlab.example.com
-    }
+gitlab.example.com {
+    reverse_proxy localhost:8080
     tls internal
 }

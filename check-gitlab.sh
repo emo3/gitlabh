@@ -2,7 +2,7 @@
 
 set -e
 
-echo "=== Check GitLab Local Installation Script (Minikube + Helm) ==="
+echo "=== Check GitLab Local Installation Script (Minikube + Helm + Caddy) ==="
 
 # Function to check if a command exists
 command_exists () {
@@ -14,12 +14,9 @@ install_missing () {
   echo "Installing missing dependencies: $1..."
 
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux-based OS
     if command_exists dnf; then
-      # Fedora/RHEL-based systems
       sudo dnf install -y $1
     elif command_exists apt-get; then
-      # Debian/Ubuntu-based systems
       sudo apt-get update
       sudo apt-get install -y $1
     else
@@ -28,7 +25,6 @@ install_missing () {
     fi
 
   elif [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
     brew install $1
 
   else
@@ -45,20 +41,15 @@ start_docker_if_not_running () {
     echo "❌ Docker is not running. Starting Docker..."
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
-      # macOS: Start Docker Desktop automatically
       open -a Docker
-      # Wait for Docker to start (increased wait time for macOS)
       echo "Waiting for Docker to start on macOS (60 seconds)..."
-      sleep 60  # Give it 60 seconds to start up
+      sleep 60
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-      # Linux: Try to start Docker using systemd
       sudo systemctl start docker
-      # Wait for Docker to start
       echo "Waiting for Docker to start on Linux..."
-      sleep 10  # Give it 10 seconds to start up
+      sleep 10
     fi
 
-    # Check if Docker started successfully
     if ! docker info >/dev/null 2>&1; then
       echo "❌ Docker failed to start. Please ensure Docker is installed and properly configured."
       exit 1
@@ -68,7 +59,7 @@ start_docker_if_not_running () {
   echo "✅ Docker is running."
 }
 
-# Function to check if Docker socket exists and is accessible
+# Function to check for Docker socket
 check_docker_socket () {
   if [ ! -S /var/run/docker.sock ] && [ ! -S /Users/emo3/.docker/run/docker.sock ]; then
     echo "❌ Docker socket not found. Docker might not be properly initialized."
@@ -76,32 +67,29 @@ check_docker_socket () {
   fi
 }
 
-# Function to start Minikube if not already running
+# Function to start Minikube if not running
 start_minikube_if_not_running () {
-  if ! minikube status >/dev/null 2>&1; then
+  echo "Checking Minikube status..."
+  if ! minikube status >/dev/null 2>&1 || [[ "$(minikube status --format '{{.Host}}')" != "Running" ]]; then
     echo "Minikube is not running. Starting Minikube..."
     minikube start --memory=8192 --cpus=4 --driver=docker
   else
-    echo "✅ Minikube is already running. Skipping Minikube start."
+    echo "✅ Minikube is already running."
   fi
 }
 
 echo ""
 echo "--- Step 1: Verify Prerequisites ---"
+
 # Check for Docker
 if ! command_exists docker; then
   echo "❌ Docker is not installed. Attempting to install Docker..."
-  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    install_missing docker
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    install_missing docker
-  fi
+  install_missing docker
   if ! command_exists docker; then
     echo "❌ Docker installation failed. Please install Docker manually."
     exit 1
   fi
 else
-  # Check if Docker is running and start it if necessary
   start_docker_if_not_running
   check_docker_socket
 fi
@@ -150,12 +138,32 @@ echo "✅ All prerequisites are met."
 
 echo ""
 echo "--- Step 2: Start Minikube ---"
-# Start Minikube only if it is not already running
 start_minikube_if_not_running
+
+echo "📌 Setting kubectl context to Minikube..."
+kubectl config use-context minikube
+
+echo "🔍 Verifying connection to Kubernetes API server..."
+sleep 5  # Give context time to settle
+
+# Ensure we're using Minikube's kubeconfig
+export KUBECONFIG=$(minikube kubeconfig)
+
+if ! kubectl get nodes >/dev/null 2>&1; then
+  echo "❌ Unable to connect to Kubernetes API server. Please verify Minikube is configured correctly:"
+  echo "   - Try: minikube status"
+  echo "   - Check kubeconfig: kubectl config view"
+  exit 1
+else
+  echo "✅ Connected to Kubernetes API server."
+fi
+
+echo "⚙️ Enabling Minikube ingress addon..."
+minikube addons enable ingress
 
 echo ""
 echo "--- Step 3: Add Helm Repo & Namespace ---"
-# Check if the GitLab Helm repo is already added
+
 if helm repo list | grep -q "gitlab"; then
   echo "✅ GitLab Helm repo already exists. Skipping adding repo."
 else
@@ -164,7 +172,6 @@ else
   echo "✅ GitLab Helm repo added and updated."
 fi
 
-# Check if the GitLab namespace exists
 if kubectl get namespace gitlab >/dev/null 2>&1; then
   echo "✅ GitLab namespace already exists. Skipping namespace creation."
 else
