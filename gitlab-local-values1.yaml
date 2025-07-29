@@ -1,0 +1,196 @@
+# gitlab-local-values.yaml
+#
+# Modified to enable cert-manager as a subchart within the GitLab Helm chart
+# for local development on Minikube with self-signed certificates.
+#
+# TEMPORARY SECURITY WARNING:
+# The initial root password is included directly in the YAML.
+# THIS IS HIGHLY INSECURE AND SHOULD NEVER BE USED IN PRODUCTION.
+# Use a Kubernetes Secret for production.
+#
+# IMPORTANT: This configuration is NOT suitable for production environments.
+
+global:
+  hosts:
+    domain: gitlab.example.com
+    host: gitlab.example.com
+    https: true
+  externalUrl: "https://gitlab.example.com"  # ADDED: External URL for GitLab
+  # WARNING: Insecure for production. Use a Kubernetes Secret instead.
+  initialRootPassword:
+    password: 'YourInsecureTestPasswordHere' # REPLACE THIS
+  # Enable cert-manager subchart to manage certificates within the GitLab release
+  certmanager:
+    install: true # <--- Enable cert-manager subchart
+    # Configure cert-manager resources for local development
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # Disable unnecessary components for local setup
+  gitlab-runner:
+    install: false
+  kas:
+    enabled: false
+  prometheus:
+    install: false
+  registry:
+    enabled: false
+  praefect:
+    enabled: false
+  gitlab-exporter:
+    enabled: false
+
+  # Enable object storage globally (using MinIO)
+  object_store:
+    enabled: true
+
+  ingress:
+    enabled: true
+    annotations:
+      ingressClassName: gitlab-nginx            # <-- Corrected ingressClassName here
+      cert-manager.io/cluster-issuer: selfsigned-cert-issuer
+    tls:
+      enabled: true
+      secretName: gitlab-tls                    
+
+gitlab:
+  webservice:
+    service:
+      type: ClusterIP
+    minReplicas: 1
+    maxReplicas: 1
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1.5Gi
+      limits:
+        cpu: 1000m
+        memory: 2.5Gi
+
+  gitlab-shell:
+    minReplicas: 1
+    maxReplicas: 1
+    host: gitlab.example.com
+    sshPort: 22
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  gitaly:
+    minReplicas: 1
+    maxReplicas: 1
+    persistence:
+      storageClass: standard
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  sidekiq:
+    minReplicas: 1
+    maxReplicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 768Mi
+      limits:
+        cpu: 500m
+        memory: 1.5Gi
+
+  appConfig:
+    artifacts:
+      enabled: true
+      storage: s3
+    lfs:
+      enabled: true
+      storage: s3
+    uploads:
+      enabled: true
+      storage: s3
+    packages:
+      enabled: true
+      storage: s3
+    backups:
+      objectStorage:
+        enabled: true
+
+  minio:
+    enabled: true
+    persistence:
+      storageClass: standard
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+  toolbox:
+    backups:
+      enabled: true
+      objectStorage:
+        enabled: true
+
+# Configure cert-manager to create a self-signed ClusterIssuer
+certmanager-issuer:
+  email: "your-email@example.com" # REPLACE WITH YOUR EMAIL
+  # Explicitly define a self-signed ClusterIssuer
+  selfSigned:
+    enabled: true # Enable self-signed issuer for local development
+
+postgresql:
+  install: true
+  persistence:
+    storageClass: standard
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+redis:
+  install: true
+  master:
+    persistence:
+      storageClass: standard
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+  replica:
+    replicaCount: 0
+
+nginx-ingress:
+  enabled: true
+  controller:
+    service:
+      type: NodePort
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi

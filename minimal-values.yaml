@@ -1,0 +1,49 @@
+global:
+  edition: ce
+  hosts:
+    domain: localhost
+    externalIP: ""
+    https: false
+    gitlab:
+      name: gitlab.localhost
+  ingress:
+    configureCertmanager: false
+    class: "none"
+
+gitlab:
+  webservice:
+    enabled: true
+    ingress:
+      enabled: false  # We will reverse proxy via Caddy
+    service:
+      type: ClusterIP
+
+  sidekiq:
+    enabled: false
+
+  gitaly:
+    enabled: false
+
+  gitlab-shell:
+    enabled: false
+
+  migrations:
+    enabled: false
+
+certmanager:
+  install: false
+
+registry:
+  enabled: false
+
+minio:
+  enabled: false
+
+redis:
+  enabled: false
+
+postgresql:
+  install: false
+
+prometheus:
+  install: false
