@@ -2,12 +2,37 @@ global:
   edition: ce
   hosts:
     domain: localhost
-    externalIP: 192.168.49.2 
+    externalIP: 192.168.49.2
     https: false
   ingress:
     configureCertmanager: false
     class: nginx
     annotations: {}
+  minio:
+    enabled: false
+  gitaly:
+    enabled: true
+    storage:
+      - name: default
+        path: /var/opt/gitlab/git-data
+  appConfig:
+    backups:
+      bucket: ""
+    lfs:
+      enabled: false
+    artifacts:
+      enabled: false
+    uploads:
+      enabled: false
+    packages:
+      enabled: false
+    externalDiffs:
+      enabled: false
+    object_store:
+      enabled: false
+
+certmanager:
+  install: false
 
 nginx-ingress:
   enabled: true
@@ -24,3 +49,32 @@ redis:
 
 postgresql:
   install: true
+
+registry:
+  enabled: false
+
+gitlab-runner:
+  install: false
+
+kas:
+  enabled: false
+
+prometheus:
+  install: false
+
+grafana:
+  enabled: false
+
+toolbox:
+  backups:
+    objectStorage:
+      enabled: false
+
+gitlab:
+  toolbox:
+    backups:
+      objectStorage:
+        enabled: false
+        config:
+          secret: dummy-backup-secret
+          key: config

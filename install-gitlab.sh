@@ -113,29 +113,32 @@ print_status "Installing GitLab (this may take several minutes)..."
 helm repo add gitlab https://charts.gitlab.io/ >/dev/null 2>&1 || true
 helm repo update >/dev/null 2>&1
 
-# Check if GitLab is already installed
-if helm list -n "$NAMESPACE" | grep -q "$HELM_RELEASE"; then
-    print_warning "GitLab is already installed. Upgrading..."
-    helm upgrade "$HELM_RELEASE" gitlab/gitlab \
-        --namespace "$NAMESPACE" \
-        --set global.hosts.domain=localhost \
-        --set global.hosts.externalIP=127.0.0.1 \
-        --set certmanager.install=false \
-        --set global.ingress.tls.enabled=false \
-        --set gitlab-runner.install=true
-else
-    print_status "Creating namespace and installing GitLab..."
-    kubectl create namespace "$NAMESPACE" 2>/dev/null || true
-    
-    helm install "$HELM_RELEASE" gitlab/gitlab \
-        --namespace "$NAMESPACE" \
-        --set global.hosts.domain=localhost \
-        --set global.hosts.externalIP=127.0.0.1 \
-        --set certmanager.install=false \
-        --set global.ingress.tls.enabled=false \
-        --set gitlab-runner.install=true
-fi
+print_status "Creating namespace if it doesn't exist..."
+kubectl create namespace "$NAMESPACE" 2>/dev/null || true
 
+print_status "Creating dummy backup secret..."
+kubectl create secret generic dummy-backup-secret \
+  --from-literal=config="{}" \
+  -n "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+# Shared Helm values
+HELM_VALUES=(
+  --namespace "$NAMESPACE"
+  --set global.hosts.domain=localhost
+  --set global.hosts.externalIP=127.0.0.1
+  --set certmanager.install=false
+  --set certmanager-issuer.email=dummy@example.com
+  --set global.ingress.tls.enabled=false
+  --set global.ingress.configureCertmanager=false
+  --set gitlab-runner.install=true
+  -f    minimal-values.yaml
+)
+
+helm upgrade --install "$HELM_RELEASE" gitlab/gitlab \
+  "${HELM_VALUES[@]}"
+
+print_status "Creating namespace and installing GitLab..."
+kubectl create namespace "$NAMESPACE" 2>/dev/null || true
 print_success "GitLab Helm chart installed"
 
 print_section "Step 3: Wait for GitLab Pods to be Ready"
