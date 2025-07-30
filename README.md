@@ -25,39 +25,9 @@ This guide sets up a **fully functional GitLab instance** on your local machine 
 
 ## 🚀 Quick Start (Automated)
 
-### 1. Create Configuration File
+### 1. Update Configuration File, if needed
 
-First, create the required `minimal-values.yaml` configuration file in your project directory:
-
-```yaml
-global:
-  edition: ce
-  hosts:
-    domain: localhost
-    externalIP: 192.168.49.2 
-    https: false
-  ingress:
-    configureCertmanager: false
-    class: nginx
-    annotations: {}
-
-nginx-ingress:
-  enabled: true
-  controller:
-    service:
-      type: NodePort
-
-gitlab:
-  webservice:
-    replicas: 1
-
-redis:
-  install: true
-
-postgresql:
-  install: true
-```
-
+[minimal-values.yaml](./minimal-values.yaml)
 > **Note:** You may need to update the `externalIP` to match your minikube IP (get it with `minikube ip`).
 
 ### 2. Check Prerequisites & Setup Environment
