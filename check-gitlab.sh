@@ -146,41 +146,12 @@ start_minikube_if_not_running() {
     fi
 }
 
-# Function to create configuration file if missing
-create_config_file() {
+# Function to check for configuration file
+check_config_file() {
     if [ ! -f "$VALUES_FILE" ]; then
-        print_warning "Configuration file '$VALUES_FILE' not found. Creating it..."
-        
-        cat > "$VALUES_FILE" << 'EOF'
-global:
-  edition: ce
-  hosts:
-    domain: localhost
-    externalIP: 192.168.49.2 
-    https: false
-  ingress:
-    configureCertmanager: false
-    class: nginx
-    annotations: {}
-
-nginx-ingress:
-  enabled: true
-  controller:
-    service:
-      type: NodePort
-
-gitlab:
-  webservice:
-    replicas: 1
-
-redis:
-  install: true
-
-postgresql:
-  install: true
-EOF
-        print_success "Created '$VALUES_FILE' with default configuration"
-        print_status "You may need to update the externalIP (192.168.49.2) to match your minikube IP"
+        print_error "Configuration file '$VALUES_FILE' not found!"
+        print_status "Please create '$VALUES_FILE' before proceeding."
+        return 1
     else
         print_success "Configuration file '$VALUES_FILE' found"
     fi
@@ -276,14 +247,7 @@ MINIKUBE_IP=$(minikube ip)
 print_success "Minikube IP: $MINIKUBE_IP"
 
 echo ""
-echo "--- Step 3: Configure Kubernetes ---"
-
-print_status "Enabling Minikube ingress addon..."
-minikube addons enable ingress >/dev/null 2>&1
-print_success "Ingress addon enabled"
-
-echo ""
-echo "--- Step 4: Setup Helm Repository ---"
+echo "--- Step 3: Setup Helm Repository ---"
 
 if helm repo list 2>/dev/null | grep -q "gitlab"; then
     print_success "GitLab Helm repo already exists"
@@ -296,7 +260,7 @@ helm repo update >/dev/null 2>&1
 print_success "Helm repositories updated"
 
 echo ""
-echo "--- Step 5: Setup Namespace ---"
+echo "--- Step 4: Setup Namespace ---"
 
 if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
     print_success "GitLab namespace already exists"
@@ -306,8 +270,10 @@ else
 fi
 
 echo ""
-echo "--- Step 6: Configuration File ---"
-create_config_file
+echo "--- Step 5: Configuration File ---"
+if ! check_config_file; then
+    exit 1
+fi
 
 echo ""
 echo "🎉 Environment Check Complete!"

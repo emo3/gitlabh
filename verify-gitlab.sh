@@ -2,111 +2,249 @@
 
 set -e
 
-HOST_ENTRY="127.0.0.1 gitlab.example.com"
+HOST_ENTRY="127.0.0.1 gitlab.localhost"
 HOSTS_FILE="/etc/hosts"
-HOSTNAME="gitlab.example.com"
-URL="https://$HOSTNAME"
-TIMEOUT=3
+HOSTNAME="gitlab.localhost"
+NAMESPACE="gitlab"
+TIMEOUT=10
 ALLOW_SELF_SIGNED=true
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_status() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Function to run command with timeout
+run_with_timeout() {
+    local timeout=$1
+    shift
+    timeout "$timeout" "$@" 2>/dev/null || return 1
+}
 
 echo "🔧 Starting GitLab connectivity diagnostics..."
 
+# Check if minikube is running
+echo ""
+echo "🔍 Step 1: Checking Minikube status..."
+if minikube status >/dev/null 2>&1; then
+    MINIKUBE_IP=$(minikube ip)
+    print_success "Minikube is running (IP: $MINIKUBE_IP)"
+else
+    print_error "Minikube is not running. Please start it first with:"
+    echo "  minikube start --memory=8192 --cpus=4 --driver=docker"
+    exit 1
+fi
+
 # Check /etc/hosts
 echo ""
-echo "🔍 Step 1: Checking /etc/hosts entry..."
+echo "🔍 Step 2: Checking /etc/hosts entry..."
 if grep -q "$HOST_ENTRY" "$HOSTS_FILE"; then
-    echo "✅ Found /etc/hosts entry: $HOST_ENTRY"
+    print_success "Found /etc/hosts entry: $HOST_ENTRY"
 else
-    echo "❌ /etc/hosts is missing required entry: $HOST_ENTRY"
+    print_error "/etc/hosts is missing required entry: $HOST_ENTRY"
     echo "Add it manually with:"
     echo "  echo \"$HOST_ENTRY\" | sudo tee -a $HOSTS_FILE"
     exit 1
 fi
 
-# Resolve hostname using ping (respects /etc/hosts)
+# Check GitLab pods
 echo ""
-echo "🔍 Step 2: Resolving $HOSTNAME to IP..."
-RESOLVED_IP=$(ping -c 1 "$HOSTNAME" 2>/dev/null | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n1)
-if [ -z "$RESOLVED_IP" ]; then
-    echo "❌ Could not resolve $HOSTNAME. Check /etc/hosts."
+echo "🔍 Step 3: Checking GitLab pods in namespace '$NAMESPACE'..."
+if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
+    print_success "GitLab namespace exists"
+    
+    # Count running pods
+    running_pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | \
+        grep -v "gitlab-runner" | \
+        grep -E "(Running|Completed)" | \
+        wc -l | tr -d ' ')
+    
+    total_pods=$(kubectl get pods -n "$NAMESPACE" --no-headers 2>/dev/null | \
+        grep -v "gitlab-runner" | \
+        wc -l | tr -d ' ')
+    
+    if [ "$total_pods" -gt 0 ]; then
+        if [ "$running_pods" -eq "$total_pods" ]; then
+            print_success "All GitLab pods are ready ($running_pods/$total_pods)"
+        else
+            print_warning "Some pods not ready ($running_pods/$total_pods)"
+            echo "Pod status:"
+            kubectl get pods -n "$NAMESPACE"
+        fi
+    else
+        print_error "No GitLab pods found. Is GitLab installed?"
+        exit 1
+    fi
+else
+    print_error "GitLab namespace '$NAMESPACE' does not exist"
     exit 1
 fi
-echo "✅ Resolved $HOSTNAME to $RESOLVED_IP"
+
+# Check ingress
+echo ""
+echo "🔍 Step 4: Checking GitLab ingress..."
+if kubectl get ingress -n "$NAMESPACE" >/dev/null 2>&1; then
+    print_success "GitLab ingress exists"
+    kubectl get ingress -n "$NAMESPACE"
+else
+    print_warning "No ingress found in namespace '$NAMESPACE'"
+fi
+
+# Check minikube service and get URLs with timeout
+echo ""
+echo "🔍 Step 5: Checking minikube service status..."
+if kubectl get service gitlab-nginx-ingress-controller -n "$NAMESPACE" >/dev/null 2>&1; then
+    print_success "GitLab nginx ingress service exists"
+    
+    print_status "Attempting to get service URLs (timeout: ${TIMEOUT}s)..."
+    
+    # Use timeout to prevent hanging
+    URLS=$(run_with_timeout $TIMEOUT minikube service gitlab-nginx-ingress-controller -n "$NAMESPACE" --url || echo "")
+    
+    if [ -n "$URLS" ]; then
+        print_success "Retrieved service URLs:"
+        echo "$URLS"
+        
+        # Extract HTTP and HTTPS URLs and ports
+        HTTP_URL=$(echo "$URLS" | grep -E "^http://.*:[0-9]+$" | head -1)
+        HTTPS_URL=$(echo "$URLS" | grep -E "^https://.*:[0-9]+$" | head -1)
+        
+        if [ -n "$HTTP_URL" ]; then
+            HTTP_PORT=$(echo "$HTTP_URL" | sed 's/.*://')
+            print_status "HTTP port: $HTTP_PORT"
+            echo "  HTTP access: http://$HOSTNAME:$HTTP_PORT"
+        fi
+        
+        if [ -n "$HTTPS_URL" ]; then
+            HTTPS_PORT=$(echo "$HTTPS_URL" | sed 's/.*://')
+            print_success "HTTPS port: $HTTPS_PORT"
+            echo "  HTTPS access: https://$HOSTNAME:$HTTPS_PORT"
+        fi
+        
+        # Test connectivity to the discovered ports
+        echo ""
+        echo "🔍 Step 5a: Testing port connectivity..."
+        
+        if [ -n "$HTTP_PORT" ]; then
+            if nc -z 127.0.0.1 "$HTTP_PORT" 2>/dev/null; then
+                print_success "HTTP port $HTTP_PORT is accessible"
+            else
+                print_warning "HTTP port $HTTP_PORT is not accessible"
+            fi
+        fi
+        
+        if [ -n "$HTTPS_PORT" ]; then
+            if nc -z 127.0.0.1 "$HTTPS_PORT" 2>/dev/null; then
+                print_success "HTTPS port $HTTPS_PORT is accessible"
+            else
+                print_warning "HTTPS port $HTTPS_PORT is not accessible"
+            fi
+        fi
+        
+    else
+        print_warning "Could not retrieve service URLs within ${TIMEOUT}s timeout."
+        print_status "This might be normal. You can manually start the service tunnel:"
+        echo "  minikube service gitlab-nginx-ingress-controller -n $NAMESPACE --url"
+        echo "  (This command will run in the background and provide port numbers)"
+    fi
+else
+    print_error "GitLab nginx ingress service not found"
+    exit 1
+fi
+
+# Resolve hostname using ping (respects /etc/hosts)
+echo ""
+echo "🔍 Step 6: Resolving $HOSTNAME to IP..."
+RESOLVED_IP=$(ping -c 1 "$HOSTNAME" 2>/dev/null | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n1 || echo "")
+if [ -z "$RESOLVED_IP" ]; then
+    print_error "Could not resolve $HOSTNAME. Check /etc/hosts."
+    exit 1
+fi
+print_success "Resolved $HOSTNAME to $RESOLVED_IP"
 
 # Ping test
 echo ""
-echo "🔍 Step 3: Pinging $RESOLVED_IP..."
+echo "🔍 Step 7: Pinging $RESOLVED_IP..."
 if ping -c 1 -W 1 "$RESOLVED_IP" > /dev/null 2>&1; then
-    echo "✅ Ping successful"
+    print_success "Ping successful"
 else
-    echo "⚠️ Ping failed (may be expected if ICMP blocked)"
+    print_warning "Ping failed (may be expected if ICMP blocked)"
 fi
 
-# HTTPS connection test
+# Check Docker if available
 echo ""
-echo "🔍 Step 4: Testing HTTPS connection to $URL..."
-CURL_OPTS="-v --max-time $TIMEOUT --silent --show-error --fail"
-if $ALLOW_SELF_SIGNED; then
-    CURL_OPTS="-k $CURL_OPTS"
-    echo "⚠️ Allowing self-signed certs (insecure)"
-fi
-
-if curl $CURL_OPTS "$URL" -o /dev/null; then
-    echo "✅ HTTPS connection successful"
-else
-    echo "❌ HTTPS connection failed"
-fi
-
-# Check port 443 listeners without sudo first
-echo ""
-echo "🔍 Step 5: Checking for processes listening on port 443..."
-LISTENER=""
-if command -v lsof >/dev/null 2>&1; then
-    LISTENER=$(lsof -iTCP:443 -sTCP:LISTEN 2>/dev/null || true)
-fi
-if [ -z "$LISTENER" ]; then
-    if [ "$EUID" -ne 0 ]; then
-        echo "⚠️ No listener found on port 443, trying with sudo..."
-        if command -v lsof >/dev/null 2>&1; then
-            LISTENER=$(sudo lsof -iTCP:443 -sTCP:LISTEN 2>/dev/null || true)
-        fi
-    fi
-fi
-
-if [ -n "$LISTENER" ]; then
-    echo "✅ Process(es) listening on port 443:"
-    echo "$LISTENER"
-else
-    echo "❌ No process listening on port 443 found."
-    echo "   Make sure your reverse proxy (Caddy) is running and listening on port 443."
-fi
-
-# Docker daemon check
-echo ""
-echo "🔍 Step 6: Checking Docker daemon and containers..."
+echo "🔍 Step 8: Checking Docker status..."
 if command -v docker >/dev/null 2>&1; then
     if docker info >/dev/null 2>&1; then
-        echo "✅ Docker daemon is running."
-        echo "🐳 Running containers:"
-        docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Ports}}"
+        print_success "Docker daemon is running"
+        
+        # Show running containers related to minikube
+        print_status "Minikube-related containers:"
+        docker ps --filter name=minikube --format "table {{.Names}}\t{{.Image}}\t{{.Status}}" 2>/dev/null || echo "None found"
     else
-        echo "❌ Docker daemon is NOT running."
+        print_error "Docker daemon is NOT running"
     fi
 else
-    echo "⚠️ Docker is not installed."
-fi
-
-# Check Caddy process
-echo ""
-echo "🔍 Step 7: Checking for Caddy process..."
-if pgrep -x caddy >/dev/null 2>&1; then
-    echo "✅ Caddy process is running."
-else
-    echo "❌ Caddy process not found."
-    echo "   Try starting it with: sudo systemctl start caddy"
-    echo "   Or, if you use Docker compose, run: docker-compose up -d caddy"
+    print_warning "Docker is not installed or not in PATH"
 fi
 
 echo ""
 echo "🏁 Diagnostics complete."
-echo "Try accessing $URL in your browser."
+echo ""
+echo "📋 Summary:"
+echo "  - Minikube: Running (IP: $MINIKUBE_IP)"
+echo "  - GitLab namespace: Exists"
+echo "  - GitLab pods: $running_pods/$total_pods ready"
+echo "  - Hostname resolution: Working ($HOSTNAME → $RESOLVED_IP)"
+
+if [ -n "$HTTP_PORT" ] || [ -n "$HTTPS_PORT" ]; then
+    echo "  - Discovered ports:"
+    [ -n "$HTTP_PORT" ] && echo "    HTTP: $HTTP_PORT"
+    [ -n "$HTTPS_PORT" ] && echo "    HTTPS: $HTTPS_PORT"
+fi
+
+echo ""
+echo "🚀 Next steps:"
+
+# Provide specific URLs if ports were discovered
+if [ -n "$HTTPS_PORT" ]; then
+    echo "1. Access GitLab: https://$HOSTNAME:$HTTPS_PORT"
+    echo "2. Username: root"
+elif [ -n "$HTTP_PORT" ]; then
+    echo "1. Access GitLab: http://$HOSTNAME:$HTTP_PORT (will redirect to HTTPS)"
+    echo "2. Username: root"
+else
+    echo "1. Start service tunnel: minikube service gitlab-nginx-ingress-controller -n $NAMESPACE --url"
+    echo "2. Note the HTTPS port from the output"
+    echo "3. Access GitLab: https://$HOSTNAME:[HTTPS_PORT]"
+    echo "4. Username: root"
+fi
+
+echo ""
+echo "🔑 Get root password:"
+echo "kubectl get secret gitlab-gitlab-initial-root-password -n $NAMESPACE -o jsonpath=\"{.data.password}\" | base64 --decode && echo"
+
+# If ports were discovered, suggest testing them
+if [ -n "$HTTPS_PORT" ]; then
+    echo ""
+    echo "🧪 Test connectivity:"
+    echo "curl -k -I https://$HOSTNAME:$HTTPS_PORT"
+fi
