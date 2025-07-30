@@ -110,7 +110,14 @@ Monitor the deployment (this can take 5-15 minutes):
 kubectl get pods -n gitlab
 ```
 
-All pods should show `Running` or `Completed` status.
+All pods should show `Running` or `Completed` status. You can also use the included wait script:
+
+```sh
+./wait.sh          # Standard monitoring
+./wait.sh verbose  # Detailed status with color coding
+```
+
+> **Note:** The `gitlab-runner` pod may show `CrashLoopBackOff` - this is not critical for basic GitLab functionality.
 
 ---
 
@@ -198,6 +205,8 @@ If scripts fail, check their output for specific error messages and suggested fi
 
 ```sh
 kubectl get pods -n gitlab
+# Or use the enhanced wait script
+./wait.sh verbose
 ```
 
 All important pods should be `Running`. The `gitlab-runner` pod may crash - this is not critical.
@@ -236,6 +245,7 @@ This setup includes the following scripts and configuration files:
 
 - **`check-gitlab.sh`** - Verifies prerequisites and sets up environment
 - **`install-gitlab.sh`** - Installs GitLab and configures access
+- **`wait.sh`** - Monitors pod readiness with detailed status (used by install script)
 - **`cleanup-gitlab.sh`** - Removes GitLab installation and resources
 
 ### Configuration
@@ -248,6 +258,10 @@ This setup includes the following scripts and configuration files:
 # Full setup
 ./check-gitlab.sh
 ./install-gitlab.sh
+
+# Monitor pods manually (optional)
+./wait.sh          # Standard monitoring
+./wait.sh verbose  # Detailed pod status display
 
 # Cleanup when done
 ./cleanup-gitlab.sh
@@ -313,6 +327,7 @@ sudo sed -i '/gitlab.localhost/d' /etc/hosts
 ## 📚 Key Features of This Setup
 
 - **Automated setup scripts** for easy installation and cleanup
+- **Enhanced monitoring** with detailed pod status display
 - **Prerequisite checking** with automatic installation where possible
 - Uses minikube service tunneling instead of external reverse proxy
 - No Caddy required - built-in nginx ingress handles routing  
@@ -328,6 +343,7 @@ sudo sed -i '/gitlab.localhost/d' /etc/hosts
 - The HTTPS port number changes each time you restart the service tunnel
 - This setup is for local development only
 - Self-signed certificates will trigger browser warnings
+- The `wait.sh` script provides better visibility into deployment progress
 
 ---
 
