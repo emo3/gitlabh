@@ -160,3 +160,7 @@ kubectl get secret gitlab-gitlab-initial-root-password -n $NAMESPACE -o jsonpath
 echo ""
 echo "🧪 Test connectivity:"
 curl -k -I http://$HOSTNAME:8080
+
+echo ""
+echo "📊 What versions are being used:"
+kubectl get pods -n gitlab -o jsonpath="{..image}" | tr -s '[[:space:]]' '\n' | sort | uniq

@@ -3,7 +3,7 @@
 This project sets up a **fully functional local GitLab instance** using:
 
 * ✅ Minikube (Kubernetes)
-* ✅ GitLab Helm chart
+* ✅ GitLab EE Helm chart
 * ✅ Built-in nginx ingress controller
 * ✅ `gitlab.localhost` domain
 * ✅ Self-signed HTTPS
@@ -11,13 +11,20 @@ This project sets up a **fully functional local GitLab instance** using:
 
 ---
 
+## 🔧 Code Base
+
+This uses GitLabs *Official* Helm Charts, found at <https://charts.gitlab.io>.  
+Main web site to find public helm charts <https://artifacthub.io>.  
+
+---
+
 ## 📦 Prerequisites
 
-- Docker
-- Minikube
-- kubectl  
-- Helm
-- macOS/Linux
+* Docker
+* Minikube
+* kubectl  
+* Helm
+* macOS/Linux
 
 > **Note:** The setup scripts will automatically install missing prerequisites where possible.
 
@@ -38,11 +45,11 @@ This project sets up a **fully functional local GitLab instance** using:
 
 This script will:
 
-- Install missing dependencies (Docker, Minikube, kubectl, Helm)
-- Start Docker and Minikube if needed
-- Create the GitLab namespace
-- Set up Helm repositories
-- Verify your configuration file exists
+* Install missing dependencies (Docker, Minikube, kubectl, Helm)
+* Start Docker and Minikube if needed
+* Create the GitLab namespace
+* Set up Helm repositories
+* Verify your configuration file exists
 
 ### 3. Install GitLab
 
@@ -60,7 +67,7 @@ This script will:
 
 ---
 
-### 3. Access GitLab
+### 4. Access GitLab
 
 After install, visit the URL shown in terminal, e.g.:
 
@@ -72,7 +79,7 @@ Accept any browser warnings about the self-signed certificate.
 
 ---
 
-### 4. Get Root Password
+### 5. Get Root Password
 
 ```sh
 kubectl get secret gitlab-gitlab-initial-root-password -n gitlab -o jsonpath="{.data.password}" | base64 --decode && echo
@@ -185,8 +192,8 @@ sudo sed -i '/gitlab.localhost/d' /etc/hosts'     # Linux
 ## 🧠 Key Features
 
 * 🔧 Automated setup for repeatable local GitLab installs
-* 🌐 Uses `gitlab.localhost` and dynamic ports via `minikube service`
-* 🔐 Self-signed TLS for HTTPS access
+* 🌐 Uses `gitlab.localhost` and port-forwarding
+* 🔐 Self-signed for HTTP access
 * 💻 No external cloud or DNS needed
 * 🧪 Debug scripts and clean teardown process
 * 📁 Uses the official GitLab Helm chart
@@ -196,9 +203,7 @@ sudo sed -i '/gitlab.localhost/d' /etc/hosts'     # Linux
 ## 🧠 Notes
 
 * `minimal-values.yaml` is required before installation
-* HTTPS port may change between restarts
-* Accept TLS warnings in your browser
-* `gitlab-runner` is disabled for simplicity
+* `gitlab-runner` is disabled for simplicity, because Self-signed certificates were generated that do not work with gitlab-runner.
 * This setup is for local testing only — not production
 
 ---
