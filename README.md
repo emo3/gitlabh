@@ -1,220 +1,215 @@
-# Create helm chart that will create gitlab server with postgresql
+# 🛠️ Local GitLab Setup with Minikube + Helm
 
-## Use public helm chart
+This project sets up a **fully functional local GitLab instance** using:
 
-Main web site to find public helm charts
-<https://artifacthub.io>
-Main documentation from GitLab about how to use helm charts
-<https://docs.gitlab.com/charts>
+* ✅ Minikube (Kubernetes)
+* ✅ GitLab EE Helm chart
+* ✅ Built-in nginx ingress controller
+* ✅ `gitlab.localhost` domain
+* ✅ Self-signed HTTPS
+* ✅ Automation scripts
 
-```sh
-# I used brew to install helm
-brew install helm minikube
-# add this repo to helm
-helm repo add gitlab http://charts.gitlab.io/
-# list current repo's
-helm repo list
-# Generate a base64 encoded password
-echo -n "YourSuperStrongPassword" | base64
-kubectl create secret generic gitlab-initial-root-password \
-  --from-literal=password='WW91clN1cGVyU3Ryb25nUGFzc3dvcmQ='
-# get a list of current secrets
-kubectl get secrets
-# what I am using, yes you need to set certmanager-issuer.email
-# initial command
-helm install gitlab gitlab/gitlab \
-  --set global.hosts.domain=localhost \
-  --set global.hosts.externalIP=127.0.0.1 \
-  --set global.hosts.https.enabled=false \
-  --values values1.yaml \
-  --set global.initialRootPassword.secret=gitlab-initial-root-password \
-  --set global.initialRootPassword.key=password \
-  --set certmanager-issuer.email=me@example.com
-# if you make changes
-helm upgrade gitlab gitlab/gitlab \
-  --values values1.yaml \
-  --set global.hosts.externalIP=127.0.0.1 \
-  --set certmanager-issuer.email=me@example.com
-# old values
-helm upgrade gitlab gitlab/gitlab \
-  --set global.hosts.domain=localhost \
-  --set global.hosts.externalIP=127.0.0.1 \
-  --set global.hosts.https.enabled=false \
-  --values values1.yaml \
-  --set global.initialRootPassword.secret=gitlab-initial-root-password \
-  --set global.initialRootPassword.key=password \
-  --set certmanager-issuer.email=me@example.com
-# check the status of the pods
-kubectl get pods
-# use the script to wait until they are all done
-./wait.sh
-# forward the port
-kubectl port-forward gitlab-webservice-default-597476bcff-k4546 8080:8080
-# check the site
-<http://localhost:8080>
-The default username is "root"
-# got 422 error
-kubectl logs gitlab-webservice-default-674fd6dbb7-xh9m5 -c webservice --tail=500 | grep "422"
-####
-## if I make a mistake or need to retry
-# Uninstall the GitLab Release
-helm uninstall gitlab
-# Verify Uninstallation
-helm list
-# persistent volume claims
-kubectl get pvc
-# use script to delete then all
-./delete_pvcs.sh
-# the persistent volumes
-kubectl get pv
-# use script to delete then all
-./delete_pvs.sh
-```
+---
 
-### issues
+## 🔧 Code Base
 
-Error: INSTALLATION FAILED: Kubernetes cluster unreachable: Get "http://localhost:8080/version": dial tcp [::1]:8080: connect: connection refused
-OR
-E0712 13:42:13.921029   51867 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://192.168.49.2:8443/api?timeout=32s\": dial tcp 192.168.49.2:8443: connect: no route to host"
+This uses GitLabs *Official* Helm Charts, found at <https://charts.gitlab.io>.  
+Main web site to find public helm charts <https://artifacthub.io>.  
 
-- Is minikube up and running?
-`minikube status`
+---
 
-Profile "minikube" not found. Run "minikube profile list" to view all profiles.
-To start a cluster, run: "minikube start"
-`minikube start --driver=docker --memory=8192 --cpus=4`
+## 📦 Prerequisites
 
-Exiting due to MK_USAGE: Docker Desktop has only 7838MB memory but you specified 8192MB
+* Docker
+* Minikube
+* kubectl  
+* Helm
+* macOS/Linux
+
+> **Note:** The setup scripts will automatically install missing prerequisites where possible.
+
+---
+
+## 🚀 Quick Start (Automated)
+
+### 1. Update Configuration File, if needed
+
+[minimal-values.yaml](./minimal-values.yaml)
+> **Note:** You may need to update the `externalIP` to match your minikube IP (get it with `minikube ip`).
+
+### 2. Check Prerequisites & Setup Environment
 
 ```sh
-minikube stop
-minikube start --driver=docker --memory=8192 --cpus=4
+./check-gitlab.sh
 ```
 
-### Pod(s) not in running or complete state
+This script will:
 
-describe the pod(s), with the issues
-`kubectl describe pod gitlab-webservice-default-674fd6dbb7-7h727`
-Verify the available memory on the nodes in your cluster.
-`kubectl describe nodes`
+* Install missing dependencies (Docker, Minikube, kubectl, Helm)
+* Start Docker and Minikube if needed
+* Create the GitLab namespace
+* Set up Helm repositories
+* Verify your configuration file exists
+
+### 3. Install GitLab
+
+```sh
+./install-gitlab.sh
+```
+
+This script will:
+
+* Install GitLab using Helm and your config
+* Wait for all GitLab pods to be ready
+* Create any needed dummy secrets (e.g., for backups)
+* Start port-forwarding
+* Print access URLs and login credentials
+
+---
+
+### 4. Access GitLab
+
+After install, visit the URL shown in terminal, e.g.:
 
 ```text
-Increase Docker Desktop Memory Limit:
-  Open Docker Desktop.
-  Go to Settings (or Preferences on macOS).
-  Navigate to the Resources section.
-  Adjust the Memory slider to allocate more memory (e.g., set it to 8192 MB or higher).
-  Click Apply & Restart to save the changes.
-Make sure you do NOT use the maximum values, this will cause other issues!
+https://gitlab.localhost:PORT
 ```
 
-Error: INSTALLATION FAILED: execution error at (gitlab/charts/certmanager-issuer/templates/cert-manager.yml:14:3): You must provide an email to associate with your TLS certificates. Please set certmanager-issuer.email
+Accept any browser warnings about the self-signed certificate.
 
-- Make sure you have "--set certmanager-issuer.email=me@example.com", in your helm install cmd
+---
 
-## Use my version of helm chart
-
-### Start Minikube with the Docker Driver
-
-This will allow you run minikube without elevated permissions
-
-`minikube start --driver=docker`
-
-If you encounter permission issues with Docker, you may need to add your user to the Docker group. You can do this with the following command:
+### 5. Get Root Password
 
 ```sh
-sudo usermod -aG docker $USER
+kubectl get secret gitlab-gitlab-initial-root-password -n gitlab -o jsonpath="{.data.password}" | base64 --decode && echo
 ```
 
-After running this command, log out and log back in for the changes to take effect.
+* **Username**: `root`
+* **Password**: (shown above or printed by install script)
 
-### Verify all is well with code
+---
+
+## 🧪 Troubleshooting
+
+### Basic Diagnostic
+
+```bash
+./verify-gitlab.sh
+```
+
+This script checks:
+
+* Pod health
+* Ingress setup
+* DNS resolution
+* Port-forward status
+
+---
+
+### Check pod status
 
 ```sh
-# Make sure all is well with all helm templates
-helm template . --debug
-# Make sure you do not have any lint issues
-helm lint .
-# Check to make sure config is set correctly
-kubectl config current-context
-# If not set to minikube, set it
-kubectl config use-context minikube
+kubectl get pods -n gitlab
 ```
 
-## Initialize helm directory
+You should see most pods in `Running` or `Completed` status.
+The `gitlab-runner` pod may crash — this is expected and non-critical.
+
+---
+
+### Manually View Ingress
 
 ```sh
-cd ~/code/cookbooks
-helm create gitlabh
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-helm search repo bitnami/postgresql --versions
-helm dependency build
+kubectl get ingress -n gitlab
 ```
 
-See the following for more information
-<https://gitlab-com.gitlab.io/support/toolbox/upgrade-path>
-If using Enterprise edition
-<https://hub.docker.com/r/gitlab/gitlab-ee/tags>
-If using Community edition
-<https://hub.docker.com/r/gitlab/gitlab-ce/tags>
+Should show `gitlab.localhost` as the host.
 
-## Run Container
+---
+
+### Manually Port Forward (if needed)
 
 ```sh
-helm upgrade --install gitlab . --dry-run --debug
-helm upgrade --install gitlab . --debug
-kubectl wait pod gitlab-845c7769d6-q6nlq --for=condition=ready --timeout=60s
-
+kubectl port-forward -n gitlab svc/gitlab-webservice-default 8080:80
 ```
 
-### Verify everything is running
+Then access: `http://gitlab.localhost:8080`
 
-`kubectl get pods`
-<http://locahost:8080>
+---
 
-# Find your running GitLab pod name (it will be different from the example)
-export POD_NAME=$(kubectl get pods -l "app=gitlab" -o jsonpath="{.items[0].metadata.name}")
-echo "Your GitLab pod is: $POD_NAME"
+## 🧼 Cleanup
 
-kubectl logs -f $POD_NAME
+### Using Script (Recommended)
 
-# Forward local port 8080 to the pod's port 80
-kubectl port-forward $POD_NAME 8080:80
-
-## more debugging
-
-kubectl exec -it $POD_NAME -- gitlab-rails console
-
-if issues, fix them
-`helm uninstall gitlab`
-kubectl delete all --all -n default
-
-## Ingress Configuration
-
-All ingress settings are managed under the `gitlab.ingress` section in `values.yaml`.  
-To customize ingress (host, TLS, annotations, etc.), edit the following block:
-
-```yaml
-gitlab:
-  ingress:
-    enabled: true
-    path: /
-    pathType: Prefix
-    annotations:
-      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    tls:
-      enabled: true
-      secretName: gitlab-tls
-    hosts:
-      - host: your-domain.example.com
-        paths:
-          - path: /
+```sh
+./cleanup-gitlab.sh
 ```
 
-- **enabled**: Set to `true` to enable ingress.
-- **hosts**: Replace `your-domain.example.com` with your domain.
-- **tls**: Set up your TLS secret as needed.
+This will:
 
-> **Note:** There is no `global.ingress` block. All ingress configuration must be done under `gitlab.ingress`.
+* Uninstall the Helm release
+* Delete the `gitlab` namespace
+* Remove host file entries
+* Stop background port-forward
+
+---
+
+### Manual Cleanup
+
+```sh
+helm uninstall gitlab -n gitlab
+kubectl delete namespace gitlab
+minikube delete
+```
+
+Remove host entry:
+
+```sh
+sudo sed -i '' '/gitlab.localhost/d' /etc/hosts'  # macOS
+```
+
+Or:
+
+```sh
+sudo sed -i '/gitlab.localhost/d' /etc/hosts'     # Linux
+```
+
+---
+
+## 📁 Project Structure
+
+| File                  | Description                                 |
+| --------------------- | ------------------------------------------- |
+| `check-gitlab.sh`     | Checks and installs prerequisites           |
+| `install-gitlab.sh`   | Installs GitLab and starts port forwarding  |
+| `verify-gitlab.sh`    | Performs health checks and diagnostics      |
+| `cleanup-gitlab.sh`   | Deletes GitLab install and cleans resources |
+| `minimal-values.yaml` | Helm values for minimal GitLab deployment   |
+
+---
+
+## 🧠 Key Features
+
+* 🔧 Automated setup for repeatable local GitLab installs
+* 🌐 Uses `gitlab.localhost` and port-forwarding
+* 🔐 Self-signed for HTTP access
+* 💻 No external cloud or DNS needed
+* 🧪 Debug scripts and clean teardown process
+* 📁 Uses the official GitLab Helm chart
+
+---
+
+## 🧠 Notes
+
+* `minimal-values.yaml` is required before installation
+* `gitlab-runner` is disabled for simplicity, because Self-signed certificates were generated that do not work with gitlab-runner.
+* This setup is for local testing only — not production
+
+---
+
+## 📚 References
+
+* [GitLab Helm Charts](https://docs.gitlab.com/charts/)
+* [Minikube Docs](https://minikube.sigs.k8s.io/)
+* [Kubernetes Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
