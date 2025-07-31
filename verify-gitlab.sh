@@ -108,71 +108,9 @@ else
     print_warning "No ingress found in namespace '$NAMESPACE'"
 fi
 
-# Check minikube service and get URLs with timeout
-echo ""
-echo "🔍 Step 5: Checking minikube service status..."
-if kubectl get service gitlab-nginx-ingress-controller -n "$NAMESPACE" >/dev/null 2>&1; then
-    print_success "GitLab nginx ingress service exists"
-    
-    print_status "Attempting to get service URLs (timeout: ${TIMEOUT}s)..."
-    
-    # Use timeout to prevent hanging
-    URLS=$(run_with_timeout $TIMEOUT minikube service gitlab-nginx-ingress-controller -n "$NAMESPACE" --url || echo "")
-    
-    if [ -n "$URLS" ]; then
-        print_success "Retrieved service URLs:"
-        echo "$URLS"
-        
-        # Extract HTTP and HTTPS URLs and ports
-        HTTP_URL=$(echo "$URLS" | grep -E "^http://.*:[0-9]+$" | head -1)
-        HTTPS_URL=$(echo "$URLS" | grep -E "^https://.*:[0-9]+$" | head -1)
-        
-        if [ -n "$HTTP_URL" ]; then
-            HTTP_PORT=$(echo "$HTTP_URL" | sed 's/.*://')
-            print_status "HTTP port: $HTTP_PORT"
-            echo "  HTTP access: http://$HOSTNAME:$HTTP_PORT"
-        fi
-        
-        if [ -n "$HTTPS_URL" ]; then
-            HTTPS_PORT=$(echo "$HTTPS_URL" | sed 's/.*://')
-            print_success "HTTPS port: $HTTPS_PORT"
-            echo "  HTTPS access: https://$HOSTNAME:$HTTPS_PORT"
-        fi
-        
-        # Test connectivity to the discovered ports
-        echo ""
-        echo "🔍 Step 5a: Testing port connectivity..."
-        
-        if [ -n "$HTTP_PORT" ]; then
-            if nc -z 127.0.0.1 "$HTTP_PORT" 2>/dev/null; then
-                print_success "HTTP port $HTTP_PORT is accessible"
-            else
-                print_warning "HTTP port $HTTP_PORT is not accessible"
-            fi
-        fi
-        
-        if [ -n "$HTTPS_PORT" ]; then
-            if nc -z 127.0.0.1 "$HTTPS_PORT" 2>/dev/null; then
-                print_success "HTTPS port $HTTPS_PORT is accessible"
-            else
-                print_warning "HTTPS port $HTTPS_PORT is not accessible"
-            fi
-        fi
-        
-    else
-        print_warning "Could not retrieve service URLs within ${TIMEOUT}s timeout."
-        print_status "This might be normal. You can manually start the service tunnel:"
-        echo "  minikube service gitlab-nginx-ingress-controller -n $NAMESPACE --url"
-        echo "  (This command will run in the background and provide port numbers)"
-    fi
-else
-    print_error "GitLab nginx ingress service not found"
-    exit 1
-fi
-
 # Resolve hostname using ping (respects /etc/hosts)
 echo ""
-echo "🔍 Step 6: Resolving $HOSTNAME to IP..."
+echo "🔍 Step 5: Resolving $HOSTNAME to IP..."
 RESOLVED_IP=$(ping -c 1 "$HOSTNAME" 2>/dev/null | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n1 || echo "")
 if [ -z "$RESOLVED_IP" ]; then
     print_error "Could not resolve $HOSTNAME. Check /etc/hosts."
@@ -182,7 +120,7 @@ print_success "Resolved $HOSTNAME to $RESOLVED_IP"
 
 # Ping test
 echo ""
-echo "🔍 Step 7: Pinging $RESOLVED_IP..."
+echo "🔍 Step 6: Pinging $RESOLVED_IP..."
 if ping -c 1 -W 1 "$RESOLVED_IP" > /dev/null 2>&1; then
     print_success "Ping successful"
 else
@@ -191,7 +129,7 @@ fi
 
 # Check Docker if available
 echo ""
-echo "🔍 Step 8: Checking Docker status..."
+echo "🔍 Step 7: Checking Docker status..."
 if command -v docker >/dev/null 2>&1; then
     if docker info >/dev/null 2>&1; then
         print_success "Docker daemon is running"
@@ -215,36 +153,10 @@ echo "  - GitLab namespace: Exists"
 echo "  - GitLab pods: $running_pods/$total_pods ready"
 echo "  - Hostname resolution: Working ($HOSTNAME → $RESOLVED_IP)"
 
-if [ -n "$HTTP_PORT" ] || [ -n "$HTTPS_PORT" ]; then
-    echo "  - Discovered ports:"
-    [ -n "$HTTP_PORT" ] && echo "    HTTP: $HTTP_PORT"
-    [ -n "$HTTPS_PORT" ] && echo "    HTTPS: $HTTPS_PORT"
-fi
-
-echo ""
-echo "🚀 Next steps:"
-
-# Provide specific URLs if ports were discovered
-if [ -n "$HTTPS_PORT" ]; then
-    echo "1. Access GitLab: https://$HOSTNAME:$HTTPS_PORT"
-    echo "2. Username: root"
-elif [ -n "$HTTP_PORT" ]; then
-    echo "1. Access GitLab: http://$HOSTNAME:$HTTP_PORT (will redirect to HTTPS)"
-    echo "2. Username: root"
-else
-    echo "1. Start service tunnel: minikube service gitlab-nginx-ingress-controller -n $NAMESPACE --url"
-    echo "2. Note the HTTPS port from the output"
-    echo "3. Access GitLab: https://$HOSTNAME:[HTTPS_PORT]"
-    echo "4. Username: root"
-fi
-
 echo ""
 echo "🔑 Get root password:"
-echo "kubectl get secret gitlab-gitlab-initial-root-password -n $NAMESPACE -o jsonpath=\"{.data.password}\" | base64 --decode && echo"
+kubectl get secret gitlab-gitlab-initial-root-password -n $NAMESPACE -o jsonpath="{.data.password}" | base64 --decode && echo
 
-# If ports were discovered, suggest testing them
-if [ -n "$HTTPS_PORT" ]; then
-    echo ""
-    echo "🧪 Test connectivity:"
-    echo "curl -k -I https://$HOSTNAME:$HTTPS_PORT"
-fi
+echo ""
+echo "🧪 Test connectivity:"
+curl -k -I http://$HOSTNAME:8080

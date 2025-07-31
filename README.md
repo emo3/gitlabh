@@ -1,13 +1,13 @@
 # 🛠️ Local GitLab Setup with Minikube + Helm
 
-This guide sets up a **fully functional GitLab instance** on your local machine using:
+This project sets up a **fully functional local GitLab instance** using:
 
-- Minikube (Kubernetes)
-- Helm chart with minimal configuration
-- Built-in nginx ingress controller
-- Domain: `https://gitlab.localhost`
-- Self-signed certificates
-- **Automated setup scripts**
+* ✅ Minikube (Kubernetes)
+* ✅ GitLab Helm chart
+* ✅ Built-in nginx ingress controller
+* ✅ `gitlab.localhost` domain
+* ✅ Self-signed HTTPS
+* ✅ Automation scripts
 
 ---
 
@@ -52,138 +52,66 @@ This script will:
 
 This script will:
 
-- Install GitLab using Helm
-- Wait for all pods to be ready
-- Configure host mapping
-- Retrieve login credentials
-- Provide access instructions
-
-### 4. Access GitLab
-
-Follow the instructions provided by the install script to access GitLab in your browser.
+* Install GitLab using Helm and your config
+* Wait for all GitLab pods to be ready
+* Create any needed dummy secrets (e.g., for backups)
+* Start port-forwarding
+* Print access URLs and login credentials
 
 ---
 
-## 🚀 Manual Setup (Alternative)
+### 3. Access GitLab
 
-### 1. Start Minikube
-
-```sh
-minikube start --memory=8192 --cpus=4 --driver=docker
-```
-
-> ❗ If the cluster already exists, you can't change CPU/memory. Use `minikube delete` to recreate if needed.
-
-### 2. Add GitLab Helm Repo
-
-```sh
-helm repo add gitlab https://charts.gitlab.io/
-helm repo update
-```
-
-### 3. Create Namespace
-
-```sh
-kubectl create namespace gitlab
-```
-
-### 4. Install GitLab with Helm
-
-Make sure `minimal-values.yaml` is in your current directory.
-
-```sh
-helm upgrade --install gitlab gitlab/gitlab -n gitlab -f minimal-values.yaml --timeout 10m
-```
-
-### 5. Wait for Deployment
-
-Monitor the deployment (this can take 5-15 minutes):
-
-```sh
-kubectl get pods -n gitlab
-```
-
-All pods should show `Running` or `Completed` status.
-
-> **Note:** The `gitlab-runner` pod may show `CrashLoopBackOff` - this is not critical for basic GitLab functionality.
-
-### 6. Get Service Access URL
-
-Start the minikube service tunnel (keep this terminal open):
-
-```sh
-minikube service gitlab-nginx-ingress-controller -n gitlab --url
-```
-
-This will output URLs like:
+After install, visit the URL shown in terminal, e.g.:
 
 ```text
-http://127.0.0.1:55707
-http://127.0.0.1:55708  # <- Use this HTTPS port
-http://127.0.0.1:55709
+https://gitlab.localhost:PORT
 ```
 
-### 7. Add Host Entry
-
-Add the domain to your hosts file:
-
-```sh
-echo "127.0.0.1 gitlab.localhost" | sudo tee -a /etc/hosts
-```
-
-### 8. Access GitLab
-
-Open your browser and go to:
-
-```text
-https://gitlab.localhost:55708
-```
-
-> Replace `55708` with your actual HTTPS port from step 6.
-> You'll see a self-signed TLS warning — click **Advanced → Proceed**.
+Accept any browser warnings about the self-signed certificate.
 
 ---
 
-## 🔑 Default Credentials
-
-### Get Root Password
+### 4. Get Root Password
 
 ```sh
 kubectl get secret gitlab-gitlab-initial-root-password -n gitlab -o jsonpath="{.data.password}" | base64 --decode && echo
 ```
 
-### Login
-
-- **Username**: `root`
-- **Password**: (from command above or displayed by install script)
+* **Username**: `root`
+* **Password**: (shown above or printed by install script)
 
 ---
 
 ## 🧪 Troubleshooting
 
-### 1. Connection timeout or 404 errors?
+### Basic Diagnostic
 
-- Ensure minikube service tunnel is running:
+```bash
+./verify-gitlab.sh
+```
 
-  ```sh
-  minikube service gitlab-nginx-ingress-controller -n gitlab --url
-  ```
+This script checks:
 
-- Use the correct host header:
+* Pod health
+* Ingress setup
+* DNS resolution
+* Port-forward status
 
-  ```sh
-  curl -I -H "Host: gitlab.localhost" -k https://127.0.0.1:YOUR_HTTPS_PORT
-  ```
+---
 
-### 2. Check pod status
+### Check pod status
 
 ```sh
 kubectl get pods -n gitlab
 ```
 
-All important pods should be `Running`. The `gitlab-runner` pod may crash - this is not critical.
+You should see most pods in `Running` or `Completed` status.
+The `gitlab-runner` pod may crash — this is expected and non-critical.
 
-### 3. View ingress configuration
+---
+
+### Manually View Ingress
 
 ```sh
 kubectl get ingress -n gitlab
@@ -191,54 +119,15 @@ kubectl get ingress -n gitlab
 
 Should show `gitlab.localhost` as the host.
 
-### 4. Alternative access method (port-forward)
-
-```sh
-kubectl port-forward -n gitlab svc/gitlab-webservice-default 8080:8080
-```
-
-Then access: `http://localhost:8080`
-
-### 5. Reset everything
-
-```sh
-./cleanup-gitlab.sh
-```
-
-Then start over with creating `minimal-values.yaml` and running `./check-gitlab.sh`
-
 ---
 
-## 📁 Project Files
-
-This setup includes the following scripts and configuration files:
-
-### Scripts
-
-- **`check-gitlab.sh`** - Verifies prerequisites and sets up environment
-- **`install-gitlab.sh`** - Installs GitLab and configures access  
-- **`cleanup-gitlab.sh`** - Removes GitLab installation and resources
-- **`verify-gitlab.sh`** - Diagnostic script for troubleshooting connectivity
-
-### Configuration
-
-- **`minimal-values.yaml`** - Helm values for GitLab installation (you must create this)
-
-### Usage
+### Manually Port Forward (if needed)
 
 ```sh
-# Create minimal-values.yaml first (see sample above)
-
-# Full setup
-./check-gitlab.sh
-./install-gitlab.sh
-
-# Cleanup when done
-./cleanup-gitlab.sh
-
-# Troubleshooting
-./verify-gitlab.sh
+kubectl port-forward -n gitlab svc/gitlab-webservice-default 8080:80
 ```
+
+Then access: `http://gitlab.localhost:8080`
 
 ---
 
@@ -249,6 +138,15 @@ This setup includes the following scripts and configuration files:
 ```sh
 ./cleanup-gitlab.sh
 ```
+
+This will:
+
+* Uninstall the Helm release
+* Delete the `gitlab` namespace
+* Remove host file entries
+* Stop background port-forward
+
+---
 
 ### Manual Cleanup
 
@@ -261,35 +159,52 @@ minikube delete
 Remove host entry:
 
 ```sh
-sudo sed -i '/gitlab.localhost/d' /etc/hosts
+sudo sed -i '' '/gitlab.localhost/d' /etc/hosts'  # macOS
+```
+
+Or:
+
+```sh
+sudo sed -i '/gitlab.localhost/d' /etc/hosts'     # Linux
 ```
 
 ---
 
-## 📚 Key Features of This Setup
+## 📁 Project Structure
 
-- **Automated setup scripts** for easy installation and cleanup
-- **Prerequisite checking** with automatic installation where possible
-- Uses minikube service tunneling instead of external reverse proxy
-- No external dependencies - built-in nginx ingress handles routing  
-- Domain is `gitlab.localhost` with dynamic HTTPS ports
-- **Comprehensive error handling** and troubleshooting guidance
-- Simple configuration with minimal resource requirements
+| File                  | Description                                 |
+| --------------------- | ------------------------------------------- |
+| `check-gitlab.sh`     | Checks and installs prerequisites           |
+| `install-gitlab.sh`   | Installs GitLab and starts port forwarding  |
+| `verify-gitlab.sh`    | Performs health checks and diagnostics      |
+| `cleanup-gitlab.sh`   | Deletes GitLab install and cleans resources |
+| `minimal-values.yaml` | Helm values for minimal GitLab deployment   |
 
 ---
 
-## ⚠️ Important Notes
+## 🧠 Key Features
 
-- **You must create `minimal-values.yaml` before running the scripts**
-- Keep the `minikube service` terminal open while using GitLab
-- The HTTPS port number changes each time you restart the service tunnel
-- This setup is for local development only
-- Self-signed certificates will trigger browser warnings
+* 🔧 Automated setup for repeatable local GitLab installs
+* 🌐 Uses `gitlab.localhost` and dynamic ports via `minikube service`
+* 🔐 Self-signed TLS for HTTPS access
+* 💻 No external cloud or DNS needed
+* 🧪 Debug scripts and clean teardown process
+* 📁 Uses the official GitLab Helm chart
+
+---
+
+## 🧠 Notes
+
+* `minimal-values.yaml` is required before installation
+* HTTPS port may change between restarts
+* Accept TLS warnings in your browser
+* `gitlab-runner` is disabled for simplicity
+* This setup is for local testing only — not production
 
 ---
 
 ## 📚 References
 
-- [GitLab Helm Charts](https://docs.gitlab.com/charts/)
-- [Minikube Docs](https://minikube.sigs.k8s.io/)
-- [Kubernetes Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+* [GitLab Helm Charts](https://docs.gitlab.com/charts/)
+* [Minikube Docs](https://minikube.sigs.k8s.io/)
+* [Kubernetes Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
